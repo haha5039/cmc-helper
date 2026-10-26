@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.haha5039.cmc" android:versionCode="1" android:versionName="1.0">
+    <uses-sdk android:minSdkVersion="33" android:targetSdkVersion="36" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <queries>
+        <package android:name="com.samsung.android.mdecservice" />
+    </queries>
+    <application android:name=".CmcApplication" android:label="CMC Helper"
+        android:theme="@style/AppTheme" android:icon="@drawable/ic_launcher"
+        android:allowBackup="false" android:debuggable="false"
+        android:supportsRtl="true" android:usesCleartextTraffic="false">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+    <instrumentation android:name=".PrepareInstrumentation"
+        android:targetPackage="com.haha5039.cmc" android:functionalTest="true" />
+    <instrumentation android:name=".ControlInstrumentation"
+        android:targetPackage="com.haha5039.cmc" android:functionalTest="true" />
+</manifest>
