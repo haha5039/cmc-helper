@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.haha5039.cmc.test" android:versionCode="1" android:versionName="1">
+    <uses-sdk android:minSdkVersion="33" android:targetSdkVersion="36" />
+    <application android:label="CMC Helper isolated UI checks" android:allowBackup="false" android:debuggable="false" />
+    <instrumentation android:name=".UiChecks" android:targetPackage="com.haha5039.cmc" android:functionalTest="true" />
+</manifest>

@@ -34,6 +34,17 @@ def run(command, env, *, private=False):
     return result.stdout
 
 
+def sign_apk(unsigned, signed, env):
+    run([sys.executable, SIGNER, "--input", unsigned, "--output", signed], env, private=True)
+    verification = run([BUILD_TOOLS / "apksigner", "verify", "--verbose", "--print-certs", signed],
+                       env, private=True)
+    digests = re.findall(r"Signer #\d+ certificate SHA-256 digest:\s*([a-fA-F0-9:]+)", verification)
+    if len(digests) != 1 or digests[0].replace(":", "").lower() != CERTIFICATE:
+        signed.unlink(missing_ok=True)
+        raise RuntimeError("Required signing certificate mismatch or unverifiable; no APK published")
+    run([BUILD_TOOLS / "zipalign", "-c", "-p", "4", signed], env)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / "cmc-helper.apk")
@@ -120,14 +131,7 @@ def main():
     unsigned = work / "aligned-unsigned.apk"
     run([BUILD_TOOLS / "zipalign", "-p", "-f", "4", unaligned, unsigned], env)
     signed = work / "cmc-helper.apk"
-    run([sys.executable, SIGNER, "--input", unsigned, "--output", signed], env, private=True)
-    verification = run([BUILD_TOOLS / "apksigner", "verify", "--verbose", "--print-certs", signed],
-                       env, private=True)
-    digests = re.findall(r"Signer #\d+ certificate SHA-256 digest:\s*([a-fA-F0-9:]+)", verification)
-    if len(digests) != 1 or digests[0].replace(":", "").lower() != CERTIFICATE:
-        signed.unlink(missing_ok=True)
-        raise RuntimeError("Required signing certificate mismatch or unverifiable; no APK published")
-    run([BUILD_TOOLS / "zipalign", "-c", "-p", "4", signed], env)
+    sign_apk(unsigned, signed, env)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     os.replace(signed, args.output)
     print(f"Verified certificate SHA-256: {CERTIFICATE}")

@@ -17,7 +17,8 @@ for spec in json.loads((ROOT/'tests/dependencies.json').read_text()):
 with tempfile.TemporaryDirectory(prefix='cmc-checks-') as directory:
     sources=[ROOT/'app/src/com/haha5039/cmc'/name for name in ['CommandSpec.java','BoundedCommand.java','OtpCalculator.java','RoleStore.java','ShizukuSession.java','CmcUserService.java']]
     sources += [ROOT/'app-preparation/com/haha5039/cmc/CmcOtp.java']
-    sources += sorted((ROOT/'tests').rglob('*.java'))
+    sources += sorted((ROOT/'tests').glob('*.java'))
+    sources += sorted((ROOT/'tests/host').rglob('*.java'))
     classpath=os.pathsep.join(map(str,dependencies))
     subprocess.run([str(JDK/'bin/javac'),'--release','8','-encoding','UTF-8','-cp',classpath,'-d',directory,*map(str,sources)],check=True)
     fixture=Path(directory)/'settings-state'
