@@ -1,88 +1,62 @@
 # CMC Helper
 
-갤럭시 휴대폰의 삼성 CMC 역할을 수신 기기(`sd`) 또는 발신 기기(`pd`)로 바꾸는 Helper입니다. 휴대폰 전체의 화면 배치나 기기 종류는 바꾸지 않습니다.
+갤럭시 휴대폰의 삼성 CMC를 수신 기기(`sd`) 또는 발신 기기(`pd`)로 준비하는 앱입니다. **1.1.0부터 Shizuku 연결 후 앱 버튼으로 준비·역할 변경·복원·역할 예외 해제를 실행**할 수 있습니다. 시스템 전체의 태블릿 모드나 화면 배치는 바꾸지 않습니다.
 
-## 권한과 실행 방식
+[APK 프리릴리스](https://github.com/haha5039/cmc-helper/releases/tag/v1.1.0)
 
-- 일반 앱에는 전화·SMS·연락처·네트워크·접근성·루트 권한을 요청하지 않습니다.
-- 역할을 쓸 때 `WRITE_SECURE_SETTINGS`가 필요합니다. `tools/device.py`는 작업 때만 ADB로 부여하고 완료·실패 후 회수합니다. 원래 부여돼 있던 권한은 유지합니다.
-- 삼성 내부 플래그 준비·해제는 PC의 ADB로 시작한 계측에서만 실행합니다. `MANAGE_GAME_ACTIVITY`를 한 번의 고정 대상 화면 실행 동안 위임받고 즉시 반환합니다. 앱의 Linux UID는 일반 앱 UID 그대로입니다.
-- 일상적으로 앱 버튼에서 역할을 바꾸려면 아래 선택 명령으로 `WRITE_SECURE_SETTINGS` 하나를 계속 부여할 수 있습니다. Shizuku는 필요하지 않습니다.
+## 휴대전화만으로 사용하기
 
-## 설치와 수신 설정
+1. APK를 설치합니다. 기존 1.0과 패키지·서명 인증서가 같아 업데이트할 수 있습니다.
+2. 휴대전화의 개발자 옵션에서 무선 디버깅을 켭니다. Shizuku 앱 안내에 따라 페어링하고 시작합니다.
+3. CMC Helper에서 **Shizuku 연결**을 누르고 권한을 허용합니다. 실제 엔진 UID가 표시됩니다.
+4. 잠금을 해제하고 **수신 기능 준비**를 누릅니다. 삼성 CMC 화면이 전환되는 동안 화면을 조작하지 않습니다.
+5. 삼성 CMC의 전체·통화·메시지 사용을 끈 뒤 **이 기기를 수신 기기로**를 누릅니다. 이미 같은 역할이면 쓰지 않습니다.
+6. **삼성 CMC 설정 열기**에서 같은 삼성 계정, 발신 휴대폰, QR 기기 연결을 확인합니다. 처음에는 두 기기를 같은 Wi-Fi에 연결합니다.
+7. 실제 전화와 별도 SMS를 보내 수신 여부를 각각 확인합니다. 사용 설정이 켜져 있다는 표시만으로 연결·수신 성공을 판정하지 않습니다.
 
-휴대폰 잠금을 해제하고 USB 디버깅을 허용한 PC에서 이 폴더를 기준으로 실행합니다. 여러 기기가 연결돼 있으면 각 명령에 `--serial 기기번호`를 추가합니다.
+Shizuku는 Android 11 이상에서 무선 디버깅으로 PC 없이 시작할 수 있습니다. 재부팅 후에는 다시 시작해야 합니다. [공식 시작 안내](https://shizuku.rikka.app/guide/setup/)
 
-```sh
-python3 tools/device.py install
-python3 tools/device.py prepare
-python3 tools/device.py receiver
-```
+## 지원 범위와 권한
 
-`prepare`는 삼성 CMC 정보 화면 → 개발자 인증 → 테스트 플래그 설정을 자동으로 진행합니다. 화면을 조작하지 말고 완료를 기다리세요. 초기화·재부팅 버튼은 누르지 않습니다.
+무선 디버깅으로 시작한 Shizuku는 shell UID 2000, 루트로 시작한 서버는 UID 0입니다. 앱이 실제 모드를 구분합니다. 루트 없이 쓰려면 Shizuku를 무선 디버깅으로 시작하세요.
 
-Helper의 **네이티브 CMC 열기**에서 설정을 계속합니다. 발신 휴대폰과 같은 삼성 계정으로 로그인하고, 처음에는 두 기기를 같은 Wi-Fi에 연결합니다. 발신 휴대폰의 CMC도 켜져 있어야 합니다. 실제 전화와 SMS 도착 여부를 각각 시험하세요.
+## 역할 변경과 예외 ON/OFF
 
-이미 CMC가 사용 중일 때는 같은 역할 확인만 허용합니다. 다른 역할로 바꾸려면 삼성 CMC에서 전화·메시지를 모두 끕니다.
+- **수신 기능 준비:** 삼성 정보 화면의 인증된 경로로 내부 `test_flag`를 켭니다.
+- **수신/발신 기기:** 원래 값을 기록하고 쓰기 후 3초간 확인합니다. 실패 시 복원하며 외부에서 바뀐 값은 덮어쓰지 않습니다.
+- **원래 역할 복원:** 최초 쓰기 전에 보관한 값으로 복원합니다. 원래 키가 없던 상태도 구분합니다.
+- **역할 예외 해제:** CMC 사용이 모두 꺼져 있고 `pd`일 때만 허용합니다. 삼성 기본 OFF·Reset 동작은 사용하지 않습니다.
 
-## 역할 왕복 전환
+예외가 꺼지면 휴대폰의 `sd`를 삼성 CMC가 기본 `pd`로 되돌립니다. 켜져 있으면 두 역할을 허용합니다. 표시용 개발자 스위치와 내부 `test_flag`는 별개입니다.
 
-```sh
-# 삼성 CMC에서 전화·메시지를 모두 끈 뒤 실행
-python3 tools/device.py sender
-python3 tools/device.py receiver
+## Shizuku 구현
 
-# 이 Helper가 최초 변경 전에 저장한 역할로 복원
-python3 tools/device.py restore
-```
+UserService의 IPC는 고정 역할 쓰기와 고정 준비 작업만 제공합니다. 입력 문자열을 셸 코드로 실행하지 않습니다. 시간·출력 길이를 제한하고 요청 ID가 맞는 완료 결과만 받습니다. 버튼 작업은 직렬화하며 Activity 재생성 시 작업을 재전송하지 않습니다.
 
-## 역할 예외(test_flag) 끄기와 다시 켜기
+준비 버튼은 `am instrument --no-restart`로 실행 중인 앱에 자체 계측을 붙입니다. 숨겨진 시스템 API를 사용하는 화면 실행은 Shizuku 엔진에서 처리하고, 일반 앱의 일회성 UiAutomation이 삼성 화면을 조작합니다. 요청 ID와 Helper 자체 작업 ID를 확인합니다. 무재시작 경로가 실패해도 앱을 종료하는 계측 방식으로 자동 대체하지 않습니다.
 
-```sh
-# 삼성 CMC에서 전화·메시지를 모두 끈 상태
-python3 tools/device.py sender
-python3 tools/device.py disable-exception
+무재시작 동작은 [Android 16 AOSP ActivityThread](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android16-release/core/java/android/app/ActivityThread.java)의 `handleInstrumentWithoutRestart`와 종료 처리를 참고했습니다. Samsung 펌웨어의 새 Shizuku 경로는 아직 시험하지 않았습니다.
 
-# 다시 수신 역할을 허용
-python3 tools/device.py prepare
-python3 tools/device.py receiver
-```
-
-`disable-exception`은 내부 `test_flag`만 해제하는 경로입니다. 삼성 개발자 화면의 표시용 스위치는 켜져 있을 수 있습니다. 내부 플래그와 표시 스위치는 서로 다른 값입니다. 기본 스위치를 직접 끄면 삼성 CMC가 초기화와 재부팅을 요청하므로 이 Helper는 그 동작을 사용하지 않습니다.
-
-예외가 꺼진 휴대폰에서 `sd`를 쓰면 삼성 CMC가 다시 `pd`로 돌립니다. Helper는 이를 실패로 표시하고 기존 역할·복원 기록을 보존합니다. 예외가 켜져 있으면 `sd`와 `pd`가 모두 허용됩니다.
-
-## 앱 버튼을 계속 사용하려는 경우
+## 개발과 검사
 
 ```sh
-adb shell pm grant com.haha5039.cmc android.permission.WRITE_SECURE_SETTINGS
-
-# 필요가 없어졌을 때 회수
-adb shell pm revoke com.haha5039.cmc android.permission.WRITE_SECURE_SETTINGS
-```
-
-권한을 회수해도 이미 적용한 역할은 지워지지 않습니다. 상태 확인과 삼성 CMC 열기는 계속 사용할 수 있습니다. 플래그 설정·해제에는 별도로 ADB 계측 실행이 필요합니다.
-
-## 작동 원리
-
-삼성 `CommonUtils.isValidDeviceType()`는 저장된 `cmc_device_type`이 실제 기기 기본 역할과 같거나 내부 `TemporaryData.test_flag`가 참이면 허용합니다. 실제 휴대폰 기본 역할은 계속 `pd`입니다. 예외가 꺼져 있으면 `DeviceTypeObserver`와 초기화·내부 API 검사가 불일치를 감지해 기본 역할로 복원합니다.
-
-켜기는 삼성 정보 화면의 인증된 경로로 `test_flag=true`를 기록합니다. 끄기는 인증되지 않은 개발자 화면의 **켜기 콜백**이 `test_flag=false`를 기록하는 현재 버전 동작을 사용합니다. 일회성 인증 표식이 남아 있는 경우까지 고려해 화면을 두 번 새로 엽니다. 기본 OFF/Reset 동작은 호출하지 않습니다.
-
-설치된 OneUIX와 upstream의 CMC 관련 훅은 `SimUtils.isChinaSIMActive()` 결과를 바꾸는 지역 제한 해제입니다. 이번 검증에서는 OneUIX CMC 옵션을 끈 상태에서 플래그 OFF 시 `sd`가 거부되고 ON 시 유지되는 것을 비교했습니다. OneUIX 소스나 삼성 APK 코드는 이 앱에 포함하지 않습니다.
-
-## 빌드
-
-```sh
+python3 tools/check-host.py
 python3 tools/build.py
 ```
 
-JDK 17, Android SDK platform/build-tools 36을 사용합니다. `JAVA_HOME`, `ANDROID_HOME`, `CMC_SIGNING_HELPER`로 로컬 도구 경로를 지정할 수 있습니다. 서명은 기존 local signing helper helper의 비공개 설정을 외부에서 사용합니다. 설정이 없거나 인증서가 다르면 실패하며 새 키를 생성하지 않습니다.
+JDK 17과 Android SDK platform/build-tools 36을 사용합니다. `JAVA_HOME`, `ANDROID_HOME`, `CMC_SIGNING_HELPER`로 경로를 지정할 수 있습니다. 의존성 해시는 `app/dependencies.json`으로 확인하며 라이선스는 APK assets와 소스에 포함합니다.
 
-필수 인증서 SHA-256:
+서명은 기존 local signing helper helper의 비공개 설정을 외부에서 사용합니다. 없거나 인증서가 다르면 실패하며 대체 키를 만들지 않습니다.
 
 ```text
+인증서 SHA-256
 fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c
 ```
 
-참고: [OneUIX](https://github.com/SoClear/OneUIX), [CMC 관련 upstream 코드](https://github.com/SoClear/OneUIX/blob/6ccbb71fe81464eaeb396de89160cd948b500d58/hook/src/main/java/io/github/soclear/oneuix/hook/MdecService.kt).
+## 기존 ADB 방식 (선택)
+
+`python3 tools/device.py install|prepare|receiver|sender|restore|disable-exception`을 사용할 수 있습니다. 실제 실행에서는 작업 이름 하나를 지정합니다. 여러 기기는 `--serial`을 추가합니다. 역할 스크립트는 쓰기 동안만 WRITE_SECURE_SETTINGS를 부여하고 회수하며, 원래 있던 사용자 승인은 유지합니다. Shizuku 앱 버튼에는 이 PC 명령이 필요하지 않습니다.
+
+## 기록
+
+참고: [Shizuku API](https://github.com/RikkaApps/Shizuku-API), [OneUIX CMC 훅](https://github.com/SoClear/OneUIX/blob/6ccbb71fe81464eaeb396de89160cd948b500d58/hook/src/main/java/io/github/soclear/oneuix/hook/MdecService.kt).

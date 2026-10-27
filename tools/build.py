@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Build the framework-only app and optional parent instrumentation; never uses ADB."""
+"""Build the app with pinned Shizuku dependencies and self-instrumentation; never uses ADB."""
 import argparse
+import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -41,7 +43,7 @@ def main():
                         help="Additional Java source file/directory; repeat as needed")
     args = parser.parse_args()
     for required in (JDK / "bin/javac", ANDROID_JAR, SIGNER,
-                     *(BUILD_TOOLS / name for name in ("aapt2", "d8", "zipalign", "apksigner"))):
+                     *(BUILD_TOOLS / name for name in ("aapt2", "aidl", "d8", "zipalign", "apksigner"))):
         if not required.is_file():
             raise RuntimeError(f"Required build/signing tool unavailable: {required}")
     env = os.environ.copy()
@@ -53,16 +55,37 @@ def main():
     generated, classes, dex = (work / name for name in ("generated", "classes", "dex"))
     for directory in (generated, classes, dex):
         directory.mkdir()
+    dependencies = []
+    cache = ROOT / ".deps"
+    cache.mkdir(exist_ok=True)
+    for dependency in json.loads((ROOT / "app/dependencies.json").read_text()):
+        artifact = cache / dependency["file"]
+        if not artifact.exists():
+            run(["curl", "--fail", "--location", "--silent", "--show-error", "--max-time", "60",
+                 dependency["url"], "--output", artifact], env)
+        if hashlib.sha256(artifact.read_bytes()).hexdigest() != dependency["sha256"]:
+            raise RuntimeError("Dependency digest mismatch: " + artifact.name)
+        if artifact.suffix == ".aar":
+            jar = work / (artifact.stem + ".jar")
+            with zipfile.ZipFile(artifact) as archive:
+                jar.write_bytes(archive.read("classes.jar"))
+        else:
+            jar = artifact
+        dependencies.append(jar)
+    for source in (ROOT / "app/aidl").rglob("*.aidl"):
+        run([BUILD_TOOLS / "aidl", "--lang=java", "--min_sdk_version=33",
+             "-p", ANDROID_JAR.parent / "framework.aidl", "-I", ROOT / "app/aidl",
+             "-o", generated, source], env)
     resource_zip = work / "resources.zip"
     run([BUILD_TOOLS / "aapt2", "compile", "--dir", ROOT / "app/res", "-o", resource_zip], env)
     resources = work / "resources.apk"
     run([BUILD_TOOLS / "aapt2", "link", "-o", resources, "-I", ANDROID_JAR,
          "--manifest", ROOT / "app/AndroidManifest.xml", "--min-sdk-version", "33",
-         "--target-sdk-version", "36", "--java", generated, resource_zip], env)
+         "--target-sdk-version", "36", "--java", generated, "-A", ROOT / "app/assets", resource_zip], env)
 
     # Parent-owned setup and tests are compiled recursively if present. EXTRA accepts
     # os.pathsep-separated additional source roots, as does repeated --extra-java.
-    source_roots = [ROOT / "app", ROOT / "app-preparation", ROOT / "tests", generated]
+    source_roots = [ROOT / "app", ROOT / "app-preparation", generated]
     extras = args.extra_java + [Path(path) for path in os.environ.get("EXTRA", "").split(os.pathsep) if path]
     for path in extras:
         if not path.exists():
@@ -79,15 +102,16 @@ def main():
     source_list = work / "sources.txt"
     source_list.write_text("\n".join('"' + str(path).replace('\\', '\\\\').replace('"', '\\"') + '"'
                                       for path in sorted(sources)), encoding="utf-8")
-    print(f"Compiling {len(sources)} Java sources (including app-preparation/tests when present)", flush=True)
+    print(f"Compiling {len(sources)} Java sources (app, self-instrumentation and generated AIDL)", flush=True)
     run([JDK / "bin/javac", "-encoding", "UTF-8", "--release", "8",
-         "-classpath", ANDROID_JAR, "-d", classes, "@" + str(source_list)], env)
+         "-classpath", os.pathsep.join(str(p) for p in [ANDROID_JAR, *dependencies]),
+         "-d", classes, "@" + str(source_list)], env)
     class_jar = work / "classes.jar"
     with zipfile.ZipFile(class_jar, "w", zipfile.ZIP_DEFLATED) as jar:
         for path in sorted(classes.rglob("*.class")):
             jar.write(path, path.relative_to(classes).as_posix())
     run([BUILD_TOOLS / "d8", "--release", "--min-api", "33", "--lib", ANDROID_JAR,
-         "--output", dex, class_jar], env)
+         "--output", dex, class_jar, *dependencies], env)
     unaligned = work / "unaligned.apk"
     shutil.copyfile(resources, unaligned)
     with zipfile.ZipFile(unaligned, "a", zipfile.ZIP_DEFLATED) as apk:

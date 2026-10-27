@@ -17,19 +17,21 @@ import java.lang.reflect.Method;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** ADB-only, finite setup. Never launches ResetService or presses Apply and Reset. */
+/** Finite self-instrumentation started by Shizuku or ADB. Never invokes ResetService. */
 public final class PrepareInstrumentation extends Instrumentation {
     private static final String CMC = "com.samsung.android.mdecservice";
     private static final String PREFIX = CMC + ":id/";
     private UiAutomation automation;
     private Bundle arguments;
+    private long deadline;
 
     @Override public void onCreate(Bundle args) { arguments = args; start(); }
 
     @Override public void onStart() {
         Bundle out = new Bundle();
+        deadline = SystemClock.uptimeMillis() + 45000;
+        out.putString("request_id", arguments == null ? "" : arguments.getString("request_id", ""));
         out.putInt("actual_uid", Process.myUid());
-        boolean adopted = false;
         try {
             Context context = getTargetContext();
             if (Process.myUid() < 10000) throw new SecurityException("일반 앱 UID에서만 실행합니다.");
@@ -54,20 +56,21 @@ public final class PrepareInstrumentation extends Instrumentation {
             Intent helper = new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             Activity activity = startActivitySync(helper);
             final int task = activity.getTaskId();
-            Class<?> iface = Class.forName("android.app.IActivityTaskManager");
-            Object atm = Class.forName("android.app.ActivityTaskManager").getMethod("getService").invoke(null);
+            boolean phone = arguments != null && "shizuku".equals(arguments.getString("bridge", ""));
+            Class<?> iface = phone ? null : Class.forName("android.app.IActivityTaskManager");
+            Object atm = phone ? null : Class.forName("android.app.ActivityTaskManager").getMethod("getService").invoke(null);
             Method launch = null;
-            for (Method method : iface.getMethods())
+            if (!phone) for (Method method : iface.getMethods())
                 if (method.getName().equals("startActivityFromGameSession") && method.getParameterTypes().length == 8) {
                     if (launch != null) throw new IllegalStateException("플랫폼 API가 모호합니다.");
                     launch = method;
                 }
-            if (launch == null) throw new IllegalStateException("플랫폼에 게임 세션 실행 API가 없습니다.");
+            if (!phone && launch == null) throw new IllegalStateException("플랫폼에 게임 세션 실행 API가 없습니다.");
             if ("disable".equals(operation)) {
                 // The activity consumes and deletes the one-shot verification marker.
                 // Two fresh entries guarantee that the second entry is unverified.
                 for (int pass = 0; pass < 2; pass++) {
-                    launchNative(launch, atm, task, "com.samsung.android.cmcsettings.view.aboutpage.DeveloperActivity");
+                    requestLaunch(phone, launch, atm, task, true);
                     waitId(PREFIX + "save_restart_btn", 5000);
                     AccessibilityNodeInfo toggle = checkable(waitId(PREFIX + "dev_switch_bar", 3000));
                     if (toggle == null) throw new IllegalStateException("CMC 테스트 스위치를 찾지 못했습니다.");
@@ -86,15 +89,7 @@ public final class PrepareInstrumentation extends Instrumentation {
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP));
                 return;
             }
-            Intent about = new Intent().setComponent(new ComponentName(CMC,
-                    "com.samsung.android.cmcsettings.view.aboutpage.AboutPageActivity")).setPackage(CMC);
-            // Delegated solely for this fixed activity start; Linux UID stays the app UID.
-            automation.adoptShellPermissionIdentity("android.permission.MANAGE_GAME_ACTIVITY");
-            adopted = true;
-            Object result = launch.invoke(atm, null, context.getPackageName(), null, -1, 1000, about, task, 0);
-            automation.dropShellPermissionIdentity();
-            adopted = false;
-            if (!Integer.valueOf(0).equals(result)) throw new IllegalStateException("CMC 정보 화면 실행 실패: " + result);
+            requestLaunch(phone, launch, atm, task, false);
             waitId(PREFIX + "about_cmc_app_name_text_view", 8000);
             for (int i = 0; i < 10; i++) {
                 click(waitId(PREFIX + "about_cmc_app_name_text_view", 2000));
@@ -120,7 +115,7 @@ public final class PrepareInstrumentation extends Instrumentation {
             toggle = checkable(waitId(PREFIX + "dev_switch_bar", 2000));
             if (toggle == null || !toggle.isChecked()) throw new IllegalStateException("테스트 스위치 켜짐을 확인하지 못했습니다.");
             // No reset, reboot, server override, role change, or activation write.
-            String message = "PREPARED: 삼성 CMC 테스트 스위치를 켰습니다. 루트 사용 없음. "
+            String message = "PREPARED: 삼성 CMC 역할 예외를 켰습니다. "
                     + "역할 적용 및 실제 전화·문자 수신은 별도 확인이 필요합니다.";
             context.getSharedPreferences("cmc_helper", 0).edit().putString("preparation_result", message).commit();
             out.putString("result", message);
@@ -135,11 +130,22 @@ public final class PrepareInstrumentation extends Instrumentation {
                     .putString("preparation_result", failure).commit();
             out.putString("result", failure);
         } finally {
-            if (adopted && automation != null) automation.dropShellPermissionIdentity();
             out.putInt("game_permission_after", getTargetContext()
                     .checkSelfPermission("android.permission.MANAGE_GAME_ACTIVITY"));
             out.putInt("uid_after", Process.myUid());
             finish(Activity.RESULT_OK, out);
+        }
+    }
+
+    private void requestLaunch(boolean phone, Method launch, Object atm, int task, boolean developer) throws Exception {
+        if (phone) {
+            String request = arguments.getString("request_id", "");
+            int result = ((CmcApplication) getTargetContext().getApplicationContext())
+                    .launchForPreparation(request, developer, task);
+            if (result != 0) throw new IllegalStateException("삼성 화면 실행 실패: " + result);
+        } else {
+            launchNative(launch, atm, task, "com.samsung.android.cmcsettings.view.aboutpage."
+                    + (developer ? "DeveloperActivity" : "AboutPageActivity"));
         }
     }
 
@@ -158,7 +164,7 @@ public final class PrepareInstrumentation extends Instrumentation {
         return node;
     }
     private AccessibilityNodeInfo waitId(String id, long timeout) {
-        long until = SystemClock.uptimeMillis() + timeout;
+        long until = Math.min(deadline, SystemClock.uptimeMillis() + timeout);
         do {
             AccessibilityNodeInfo node = find(root(), id);
             if (node != null) return node;

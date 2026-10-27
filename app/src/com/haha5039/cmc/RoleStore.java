@@ -23,6 +23,10 @@ import java.util.Objects;
 
 /** Finite, journaled role operations. No services, observers, or activation writes. */
 final class RoleStore {
+    interface Writer {
+        boolean available();
+        void write(String value) throws IOException;
+    }
     static final String CMC_PACKAGE = "com.samsung.android.mdecservice";
     static final String ROLE_KEY = "cmc_device_type";
     static final String OOBE_KEY = "cmc_oobe";
@@ -35,9 +39,15 @@ final class RoleStore {
     private final ContentResolver resolver;
     private final AtomicFile state;
     private final File lockFile;
+    private final Writer writer;
 
     RoleStore(Context context) {
+        this(context, null);
+    }
+
+    RoleStore(Context context, Writer writer) {
         this.context = context.getApplicationContext();
+        this.writer = writer;
         this.resolver = this.context.getContentResolver();
         File directory = this.context.getNoBackupFilesDir();
         state = new AtomicFile(new File(directory, "cmc-role-journal.json"));
@@ -186,8 +196,8 @@ final class RoleStore {
 
     private void requireReady() throws IOException {
         if (context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS)
-                != PackageManager.PERMISSION_GRANTED)
-            throw new IOException("하단 ‘처음 설정’에서 PC 연결 명령을 실행한 뒤 다시 시도하세요.");
+                != PackageManager.PERMISSION_GRANTED && (writer == null || !writer.available()))
+            throw new IOException("Shizuku를 연결하고 권한을 허용한 뒤 다시 시도하세요.");
         try {
             PackageInfo info = context.getPackageManager().getPackageInfo(CMC_PACKAGE, 0);
             if (info.applicationInfo == null || !info.applicationInfo.enabled)
@@ -221,6 +231,10 @@ final class RoleStore {
     }
 
     private void putRole(String role) throws IOException {
+        if (writer != null && writer.available()) {
+            writer.write(role);
+            return;
+        }
         try {
             // A null value restores an originally absent setting, rather than inventing pd.
             if (!Settings.Global.putString(resolver, ROLE_KEY, role))

@@ -1,0 +1,47 @@
+package com.haha5039.cmc;
+
+import android.content.Context;
+
+/** Loaded only by the authorized Shizuku UserService mechanism, not an exported Service. */
+public final class CmcUserService extends ICmcService.Stub {
+    private volatile String activeRequest;
+    private volatile long requestDeadline;
+    public CmcUserService() {}
+    public CmcUserService(Context ignored) {}
+    @Override public int getUid() { return android.os.Process.myUid(); }
+    private void requireShell() {
+        int uid = getUid();
+        if (uid != 2000 && uid != 0) throw new SecurityException("Shizuku shell/root UID가 필요합니다.");
+    }
+    @Override public synchronized String writeRole(String role) {
+        requireShell();
+        try {
+            BoundedCommand.Result result = BoundedCommand.run(5000, CommandSpec.role(role));
+            if (!CommandSpec.wrote(role, result.exit, result.output))
+                return "WRITE_FAILED: 설정 쓰기를 완료하지 못했습니다. " + result.output;
+            return "WRITE_OK";
+        } catch (Exception error) { return "WRITE_FAILED: " + error.getMessage(); }
+    }
+    @Override public synchronized String prepare(boolean enable, String requestId) {
+        requireShell();
+        try {
+            CommandSpec.preparation(enable, requestId);
+            activeRequest = requestId;
+            requestDeadline = android.os.SystemClock.elapsedRealtime() + 75000;
+            BoundedCommand.Result result = BoundedCommand.run(75000, CommandSpec.preparation(enable, requestId));
+            if (result.exit != 0) return "BRIDGE_FAILED: 자체 준비 실행을 완료하지 못했습니다.\n" + result.output;
+            return result.output;
+        } catch (Exception error) { return "BRIDGE_FAILED: " + error.getMessage(); }
+        finally { activeRequest = null; requestDeadline = 0; }
+    }
+    // Deliberately not synchronized: the preparation IPC is waiting for this callback.
+    @Override public int launchNative(String requestId, boolean developer, int taskId) {
+        requireShell();
+        if (requestId == null || !requestId.equals(activeRequest)
+                || android.os.SystemClock.elapsedRealtime() >= requestDeadline)
+            throw new SecurityException("활성 준비 요청이 없습니다.");
+        try { return NativeLauncher.open(developer, taskId); }
+        catch (Exception error) { throw new IllegalStateException("삼성 화면 실행 실패: " + error.getMessage()); }
+    }
+    @Override public synchronized void destroy() { System.exit(0); }
+}

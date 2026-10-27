@@ -12,6 +12,7 @@ public final class CmcApplication extends Application {
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
     private RoleStore store;
+    private ShizukuSession shizuku;
     private Listener listener;
     private RoleStore.Snapshot snapshot;
     private boolean busy, error;
@@ -19,20 +20,38 @@ public final class CmcApplication extends Application {
 
     @Override public void onCreate() {
         super.onCreate();
-        store = new RoleStore(this);
+        shizuku = new ShizukuSession(this, this::publish);
+        store = new RoleStore(this, shizuku);
+        shizuku.start();
     }
 
     void attach(Listener listener) { this.listener = listener; publish(); }
     void detach(Listener listener) { if (this.listener == listener) this.listener = null; }
-    void refresh() { execute("refresh", null); }
+    void refresh() { shizuku.refresh(); execute("refresh", null); }
     void apply(String role) { execute("apply", role); }
     void restore() { execute("restore", null); }
+    void connectShizuku() { if (!busy) shizuku.authorize(); }
+    String connectionStatus() { return shizuku.label(); }
+    boolean shizukuReady() { return shizuku.available(); }
+    boolean preparationSupported() {
+        if (android.os.Build.VERSION.SDK_INT < 36) return false;
+        try {
+            android.content.pm.PackageInfo info = getPackageManager().getPackageInfo(RoleStore.CMC_PACKAGE, 0);
+            return info.getLongVersionCode() == 910015100L && "9.1.00.15".equals(info.versionName);
+        } catch (android.content.pm.PackageManager.NameNotFoundException ignored) { return false; }
+    }
+    void prepare(boolean enable) { execute(enable ? "prepare" : "disable", null); }
+    int launchForPreparation(String request, boolean developer, int task) throws Exception {
+        return shizuku.launchNative(request, developer, task);
+    }
 
     private void execute(String operation, String role) {
-        if (busy) return;
+        if (busy || shizuku.busy()) return;
         busy = true;
         if (!"refresh".equals(operation)) {
-            message = "역할을 확인하고 있습니다. 변경이 필요한 경우 약 3초 동안 검증합니다.";
+            message = "prepare".equals(operation) || "disable".equals(operation)
+                    ? "삼성 CMC 화면을 준비하고 있습니다. 완료될 때까지 화면을 조작하지 마세요."
+                    : "역할을 확인하고 있습니다. 변경이 필요한 경우 약 3초 동안 검증합니다.";
             error = false;
         }
         publish();
@@ -41,10 +60,19 @@ public final class CmcApplication extends Application {
             String result = message;
             boolean failed = error;
             try {
-                if ("apply".equals(operation)) next = store.apply(role);
+                if ("prepare".equals(operation) || "disable".equals(operation)) {
+                    if (!preparationSupported()) throw new java.io.IOException("삼성 CMC 9.1.00.15와 Android 16 이상에서 준비 기능을 지원합니다.");
+                    RoleStore.Snapshot before = store.snapshot();
+                    if (before.transactionPending) throw new java.io.IOException("중단된 역할 변경을 먼저 복원하세요.");
+                    if ("disable".equals(operation) && (before.active() || !"pd".equals(before.role)))
+                        throw new java.io.IOException("CMC 전화·메시지를 끄고 발신 역할로 바꾼 뒤 예외를 해제하세요.");
+                    result = shizuku.prepare("prepare".equals(operation), java.util.UUID.randomUUID().toString().replace("-", ""));
+                    next = store.snapshot();
+                    failed = false;
+                } else if ("apply".equals(operation)) next = store.apply(role);
                 else if ("restore".equals(operation)) next = store.restore();
                 else next = store.snapshot();
-                if (!"refresh".equals(operation)) {
+                if (!"refresh".equals(operation) && !"prepare".equals(operation) && !"disable".equals(operation)) {
                     result = next.lastResult;
                     failed = false;
                 }
@@ -67,6 +95,6 @@ public final class CmcApplication extends Application {
     }
 
     private void publish() {
-        if (listener != null) listener.changed(snapshot, busy, message, error);
+        if (listener != null) listener.changed(snapshot, busy || (shizuku != null && shizuku.busy()), message, error);
     }
 }
