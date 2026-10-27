@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.haha5039.cmc" android:versionCode="3" android:versionName="1.2.0">
+    package="com.haha5039.cmc" android:versionCode="4" android:versionName="1.3.0">
     <uses-sdk android:minSdkVersion="33" android:targetSdkVersion="36" />
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
@@ -23,6 +23,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".OtpCalculatorActivity" android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
     </application>
     <instrumentation android:name=".PrepareInstrumentation"
         android:targetPackage="com.haha5039.cmc" android:functionalTest="true" />

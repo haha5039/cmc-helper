@@ -11,6 +11,3 @@
 - Use the external local signing helper signing helper or `CMC_SIGNING_HELPER`; do not copy its private config, print credentials, or generate a fallback key. Verify the output certificate.
 - Distinguish role state, native registration, IMS registration, and actual call/SMS receipt. Do not present one as proof of another. Host-only Shizuku checks are not device execution evidence. Preserve v1.0 evidence as historical.
 - Keep private account data, raw device logs, original APKs, decompiled code, and signing material out of deliverables.
-
-- Developer shortcut must enter through About authentication and leave the real DeveloperActivity open without pressing its controls. Respect the native initial-setup prerequisite.
-- Close only CMC-owned settings tasks after a successful idle role change. Never force-stop CMC or clear its data for UI refresh.

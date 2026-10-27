@@ -77,6 +77,9 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         add(content, title, 8);
         add(content, text("휴대전화에서 준비하고, 삼성 CMC에서 연결하세요", 15, MUTED), 6);
+        Button calculator = button(content, "KEY 인증코드 계산기", "open_key_calculator", false,
+                () -> startActivity(new Intent(this, OtpCalculatorActivity.class)));
+        operationButtons.add(calculator);
 
         LinearLayout connection = card(content, "1 · Shizuku 연결", 22);
         connectionStatus = identifiedText(connection, "연결 상태 확인 중…", 16, ACCENT, "shizuku_status");
