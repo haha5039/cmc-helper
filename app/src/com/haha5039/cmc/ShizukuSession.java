@@ -14,7 +14,8 @@ import rikka.shizuku.Shizuku;
 
 /** Application-scoped authorization/connection; never queues or replays a mutation. */
 final class ShizukuSession implements RoleStore.Writer {
-    private static final int REQUEST_PERMISSION = 72;
+    private int permissionSequence = 72;
+    private int pendingPermission = -1;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService inspector = Executors.newSingleThreadExecutor();
     private final Shizuku.UserServiceArgs args;
@@ -31,11 +32,12 @@ final class ShizukuSession implements RoleStore.Writer {
         this.observer = observer;
         args = new Shizuku.UserServiceArgs(new ComponentName(context, CmcUserService.class))
                 .tag("cmc-phone-controls").processNameSuffix("cmc_engine")
-                .daemon(false).debuggable(false).version(5);
+                .daemon(false).debuggable(false).version(6);
     }
     void start() {
         Shizuku.addBinderReceivedListenerSticky(() -> main.post(() -> { problem = ""; refresh(); }));
         Shizuku.addBinderDeadListener(() -> main.post(() -> {
+            cancelPermissionRequest();
             invalidate();
             available = false;
             granted = false;
@@ -43,8 +45,8 @@ final class ShizukuSession implements RoleStore.Writer {
             observer.run();
         }));
         Shizuku.addRequestPermissionResultListener((request, grant) -> main.post(() -> {
-            if (request != REQUEST_PERMISSION) return;
-            requesting = false;
+            if (request != pendingPermission) return;
+            cancelPermissionRequest();
             refresh();
             if (grant == PackageManager.PERMISSION_GRANTED && granted) bind();
             else { problem = "Shizuku의 승인된 앱 목록에서 CMC Helper를 허용하세요."; observer.run(); }
@@ -56,9 +58,10 @@ final class ShizukuSession implements RoleStore.Writer {
             available = Shizuku.pingBinder();
             granted = available && !Shizuku.isPreV11() && Shizuku.getVersion() >= 12
                     && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED;
-            if (requesting && granted) requesting = false;
+            if (!available || granted) cancelPermissionRequest();
             if ((!available || !granted) && (registered || service != null)) invalidate();
         } catch (RuntimeException error) {
+            cancelPermissionRequest();
             available = false;
             granted = false;
             invalidate();
@@ -81,16 +84,22 @@ final class ShizukuSession implements RoleStore.Writer {
                 problem = "Shizuku 앱의 승인된 앱 목록에서 CMC Helper를 허용하세요.";
             } else {
                 requesting = true;
-                Shizuku.requestPermission(REQUEST_PERMISSION);
+                final int ticket = ++permissionSequence;
+                pendingPermission = ticket;
+                Shizuku.requestPermission(ticket);
                 main.postDelayed(() -> {
-                    if (!requesting) return;
-                    requesting = false;
+                    if (!requesting || pendingPermission != ticket) return;
+                    cancelPermissionRequest();
                     problem = "권한 응답을 확인하지 못했습니다. Shizuku에서 승인한 뒤 다시 연결하세요.";
                     refresh();
                 }, 30000);
             }
-        } catch (RuntimeException error) { requesting = false; problem = "Shizuku 권한 요청 실패: " + error.getMessage(); }
+        } catch (RuntimeException error) { cancelPermissionRequest(); problem = "Shizuku 권한 요청 실패: " + error.getMessage(); }
         observer.run();
+    }
+    private void cancelPermissionRequest() {
+        requesting = false;
+        pendingPermission = -1;
     }
     private void bind() {
         if (binding || !granted) return;

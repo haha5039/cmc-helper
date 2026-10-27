@@ -7,6 +7,7 @@
 - Never press Samsung's test-mode OFF, Apply and Reset, or call ResetService: they reset CMC and can reboot.
 - Exception disable requires idle CMC and `pd`. Its unverified positive-switch route is verified only on CMC 9.1.00.15 (910015100); fail closed for other builds.
 - Actual role writes require idle CMC. A confirmed app transition may use native call/message switches to reach idle; never forge activation flags. Save the prior role before writing, verify and preserve external changes. Same-role and cancelled requests must never deactivate CMC.
+- Run journal/access/role preflight before native preparation. Carry its expected role into the final write and reject drift. The Shizuku engine must independently recheck usage before put/delete.
 - All APKs, including test/debug builds, must use SHA-256 `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`.
 - Use the external local signing helper signing helper or `CMC_SIGNING_HELPER`; do not copy its private config, print credentials, or generate a fallback key. Verify the output certificate.
 - Distinguish role state, native registration, IMS registration, and actual call/SMS receipt. Do not present one as proof of another. Host-only Shizuku checks are not device execution evidence. Preserve v1.0 evidence as historical.

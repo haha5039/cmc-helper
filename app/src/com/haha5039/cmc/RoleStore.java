@@ -55,6 +55,29 @@ final class RoleStore {
     }
 
     synchronized Snapshot apply(String role) throws IOException {
+        return apply(role, null, false);
+    }
+
+    /** Validate before native preparation, without changing settings or the journal. */
+    synchronized Snapshot preflight(String role) throws IOException {
+        requireWorker();
+        synchronized (PROCESS_LOCK) {
+            try (RandomAccessFile file = new RandomAccessFile(lockFile, "rw");
+                 FileLock ignored = file.getChannel().lock()) {
+                Journal journal = load();
+                Snapshot before = snapshot(journal, null);
+                checkApply(journal, before.role, role);
+                if (!Objects.equals(before.role, role)) requireAccess();
+                return before;
+            }
+        }
+    }
+
+    synchronized Snapshot applyIfUnchanged(String role, String expectedRole) throws IOException {
+        return apply(role, expectedRole, true);
+    }
+
+    private Snapshot apply(String role, String expectedRole, boolean checkExpected) throws IOException {
         if (!"pd".equals(role) && !"sd".equals(role))
             throw new IllegalArgumentException("지원하는 역할은 pd와 sd입니다.");
         requireWorker();
@@ -63,18 +86,14 @@ final class RoleStore {
                  FileLock ignored = file.getChannel().lock()) {
                 Journal journal = load();
                 String before = readRole();
+                if (checkExpected && !Objects.equals(before, expectedRole)) throw conflict();
+                checkApply(journal, before, role);
                 // A same-role request never writes settings or creates a misleading backup.
                 // In particular it is safe when CMC is already registered and active.
                 if (Objects.equals(before, role))
                     return snapshot(journal, "이미 " + roleName(role) + "입니다. 설정을 변경하지 않았습니다."
                             + (journal.pending ? " 중단된 작업 기록은 원래 역할 복원에서 확인하세요." : ""));
                 requireReady();
-                if (journal.pending)
-                    throw new IOException("중단된 작업 기록이 있습니다. 먼저 ‘원래 역할 복원’을 실행하세요.");
-                if (journal.hasOriginal && journal.hasOwned
-                        && !Objects.equals(before, journal.owned)
-                        && !Objects.equals(before, journal.original))
-                    throw conflict();
                 // Returning to the saved original outside this app needs no ownership claim.
                 if (journal.hasOriginal && Objects.equals(before, journal.original))
                     journal.hasOwned = false;
@@ -85,6 +104,22 @@ final class RoleStore {
                 return transact(journal, before, role, false);
             }
         }
+    }
+
+    private static void checkApply(Journal journal, String before, String role) throws IOException {
+        if (!"pd".equals(role) && !"sd".equals(role))
+            throw new IllegalArgumentException("지원하는 역할은 pd와 sd입니다.");
+        if (Objects.equals(before, role)) return; // No-op remains safe even with a pending journal.
+        if (journal.pending)
+            throw new IOException("중단된 작업 기록이 있습니다. 먼저 ‘원래 역할 복원’을 실행하세요.");
+        if (journal.hasOriginal && !Objects.equals(before, journal.original)
+                && (!journal.hasOwned || !Objects.equals(before, journal.owned))) throw conflict();
+        if (!writableRole(before) || (journal.hasOriginal && !writableRole(journal.original)))
+            throw new IOException("알 수 없는 CMC 역할이 있어 안전하게 복원할 수 없습니다. 삼성 CMC 설정에서 현재 역할을 확인하세요.");
+    }
+
+    private static boolean writableRole(String role) {
+        return role == null || "pd".equals(role) || "sd".equals(role);
     }
 
     synchronized Snapshot restore() throws IOException {
@@ -195,6 +230,12 @@ final class RoleStore {
     }
 
     private void requireReady() throws IOException {
+        requireAccess();
+        if (isActive(read(ACTIVATION_KEY)) || isActive(read(CALL_KEY)) || isActive(read(MESSAGE_KEY)))
+            throw new IOException("CMC가 사용 중입니다. 네이티브 CMC에서 전체·통화·메시지 사용을 모두 끈 뒤 역할을 바꾸세요.");
+    }
+
+    private void requireAccess() throws IOException {
         if (context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS)
                 != PackageManager.PERMISSION_GRANTED && (writer == null || !writer.available()))
             throw new IOException("Shizuku를 연결하고 권한을 허용한 뒤 다시 시도하세요.");
@@ -205,8 +246,6 @@ final class RoleStore {
         } catch (PackageManager.NameNotFoundException e) {
             throw new IOException("삼성 CMC 앱을 찾을 수 없습니다.", e);
         }
-        if (isActive(read(ACTIVATION_KEY)) || isActive(read(CALL_KEY)) || isActive(read(MESSAGE_KEY)))
-            throw new IOException("CMC가 사용 중입니다. 네이티브 CMC에서 전체·통화·메시지 사용을 모두 끈 뒤 역할을 바꾸세요.");
     }
 
     static boolean isActive(String value) {

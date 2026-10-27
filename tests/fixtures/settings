@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+"""Finite fake settings executable for the host engine checks only."""
+import json,os,sys
+from pathlib import Path
+root=Path(os.environ['CMC_TEST_SETTINGS_DIR'])
+state=json.loads((root/'state.json').read_text())
+args=sys.argv[1:]
+with (root/'events.jsonl').open('a') as output:
+    output.write(json.dumps(args)+'\n')
+if args[:2]==['get','global'] and len(args)==3:
+    result=state.get(args[2],'null')
+    if isinstance(result,dict):
+        print(result['output'])
+        sys.exit(result['exit'])
+    print(result)
+elif args[:3]==['put','global','cmc_device_type'] and len(args)==4:
+    state['cmc_device_type']=args[3]
+    (root/'state.json').write_text(json.dumps(state))
+elif args==['delete','global','cmc_device_type']:
+    removed=state.pop('cmc_device_type',None)
+    (root/'state.json').write_text(json.dumps(state))
+    print('Deleted '+('0' if removed is None else '1')+' rows')
+else:
+    sys.exit('Unexpected fake-settings command')

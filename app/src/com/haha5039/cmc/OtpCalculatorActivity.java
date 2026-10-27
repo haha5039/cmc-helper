@@ -39,9 +39,9 @@ public final class OtpCalculatorActivity extends Activity {
     private boolean resumed;
     private final Runnable tick = new Runnable() {
         @Override public void run() {
-            if (!resumed) return;
+            if (!resumed || result == null) return;
             updateNow();
-            handler.postDelayed(this, 1000);
+            scheduleTick();
         }
     };
 
@@ -163,9 +163,11 @@ public final class OtpCalculatorActivity extends Activity {
         basis.setText("KEY " + computed.key + "\n기준: " + computed.utcMinute);
         countdown.setText("다음 코드 갱신까지 " + OtpCalculator.secondsToNextCode(System.currentTimeMillis()) + "초");
         setCopyEnabled(true);
+        scheduleTick();
     }
     private void clearResult() {
         result = null;
+        handler.removeCallbacks(tick);
         code.setText("—");
         basis.setText("KEY를 입력하고 계산을 누르세요.");
         countdown.setText("");
@@ -190,8 +192,13 @@ public final class OtpCalculatorActivity extends Activity {
         catch (IllegalStateException error) { Toast.makeText(this,error.getMessage(),Toast.LENGTH_LONG).show(); }
     }
     private void setCopyEnabled(boolean enabled) { copy.setEnabled(enabled); copy.setAlpha(enabled ? 1f : 0.45f); }
+    private void scheduleTick() {
+        handler.removeCallbacks(tick);
+        if (resumed && result != null)
+            handler.postDelayed(tick,1000L - Math.floorMod(System.currentTimeMillis(),1000L));
+    }
     @Override protected void onResume() {
-        super.onResume(); resumed = true; handler.removeCallbacks(tick); handler.post(tick);
+        super.onResume(); resumed = true; updateNow(); scheduleTick();
     }
     @Override protected void onPause() { resumed = false; handler.removeCallbacks(tick); super.onPause(); }
     @Override protected void onSaveInstanceState(Bundle state) {

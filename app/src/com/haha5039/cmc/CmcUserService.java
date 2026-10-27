@@ -16,7 +16,13 @@ public final class CmcUserService extends ICmcService.Stub {
     @Override public synchronized String writeRole(String role) {
         requireShell();
         try {
-            BoundedCommand.Result result = BoundedCommand.run(5000, CommandSpec.role(role));
+            String[] command = CommandSpec.role(role);
+            for (String key : new String[]{"cmc_activation", "cmc_call_activation", "cmc_message_activation"}) {
+                BoundedCommand.Result state = BoundedCommand.run(5000, "settings", "get", "global", key);
+                if (!CommandSpec.idleSetting(state.exit, state.output))
+                    return "WRITE_FAILED: CMC 꺼짐을 확인하지 못했습니다. 삼성 CMC에서 사용 설정을 확인하세요.";
+            }
+            BoundedCommand.Result result = BoundedCommand.run(5000, command);
             if (!CommandSpec.wrote(role, result.exit, result.output))
                 return "WRITE_FAILED: 설정 쓰기를 완료하지 못했습니다. " + result.output;
             return "WRITE_OK";

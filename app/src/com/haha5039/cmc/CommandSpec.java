@@ -28,6 +28,14 @@ final class CommandSpec {
         String body = output.trim();
         return role == null ? body.matches("Deleted [01] rows") : body.isEmpty();
     }
+    static boolean idleSetting(int exit, String output) {
+        if (exit != 0 || output == null) return false;
+        String value = output.trim();
+        if ("null".equals(value)) return true; // settings get reports an absent key as null.
+        if (!value.matches("[+-]?[0-9]+")) return false;
+        try { return Long.parseLong(value) == 0; }
+        catch (NumberFormatException ignored) { return false; }
+    }
     static boolean completed(String output, boolean enable, String request) {
         return completed(output, enable ? "prepare" : "disable", request);
     }

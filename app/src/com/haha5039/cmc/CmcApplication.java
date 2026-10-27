@@ -84,7 +84,9 @@ public final class CmcApplication extends Application {
                     next = store.snapshot();
                     failed = false;
                 } else if ("apply".equals(operation) || "apply-confirmed".equals(operation)) {
-                    RoleStore.Snapshot before = store.snapshot();
+                    // Reject interrupted/conflicting/unrestorable states before native UI
+                    // preparation can turn off calls or messages or enable the exception.
+                    RoleStore.Snapshot before = store.preflight(role);
                     if (!java.util.Objects.equals(before.role, role) && !"apply-confirmed".equals(operation))
                         throw new java.io.IOException("현재 역할이 바뀌었습니다. 상태를 새로고침한 뒤 전환 내용을 다시 확인하세요.");
                     if (!java.util.Objects.equals(before.role, role)
@@ -94,7 +96,9 @@ public final class CmcApplication extends Application {
                         shizuku.prepareRole(role, java.util.UUID.randomUUID().toString().replace("-", ""));
                         stage("준비 완료 · 역할을 적용하고 3초 동안 확인합니다.");
                     }
-                    next = store.apply(role);
+                    // Native preparation must not authorize overwriting a role changed
+                    // by Samsung or another app while its screens were open.
+                    next = store.applyIfUnchanged(role, before.role);
                     if (!java.util.Objects.equals(before.role, role) && shizuku.available()) advisory = shizuku.refreshCmcUi();
                 }
                 else if ("restore".equals(operation)) next = store.restore();

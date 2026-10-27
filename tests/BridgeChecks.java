@@ -22,6 +22,11 @@ public final class BridgeChecks {
         check(CommandSpec.wrote(null,0,"Deleted 0 rows\n"));
         check(!CommandSpec.wrote(null,0,""));
         check(!CommandSpec.wrote(null,0,"Deleted 1 rows\nSecurityException\n"));
+        for (String value : new String[]{"0", "0\n", "null\n", "00", "+0", "-0"})
+            check(CommandSpec.idleSetting(0,value));
+        for (String value : new String[]{null,"","1","-1","false","null\n0","0\nPermission denied","99999999999999999999999"})
+            check(!CommandSpec.idleSetting(0,value));
+        check(!CommandSpec.idleSetting(1,"0"));
         for (String role : new String[]{"", "tablet", "SD", "pd;reboot", "sd\nanything", "--help"}) {
             try { CommandSpec.role(role); throw new AssertionError(); }
             catch (IllegalArgumentException expected) { passed++; }
