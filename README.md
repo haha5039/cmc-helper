@@ -8,7 +8,7 @@
 
 [GitHub Pages용 계산기 소스](site/index.html)와 [실행·배포 안내](docs/web-calculator.md)를 추가했습니다. 브라우저 안에서 KEY를 계산하며 서버 전송이나 계산 내역 저장은 하지 않습니다. 앱과 일치하는 Java 참조값 136개를 검사합니다. 하단에는 현재 test_flag 기반의 수동 pd/sd 전환·복원 가이드가 있습니다.
 
-현재 저장소의 Pages 활성화는 GitHub 요금제 제한으로 보류되어 있습니다. 저장소 공개 설정은 유지합니다. `.github/workflows/pages.yml`은 계산 검사를 수행하고 Pages 활성화 이후 site 폴더만 배포합니다.
+[웹 계산기 열기](https://haha5039.github.io/cmc-helper/). `.github/workflows/pages.yml`은 계산 검사를 수행하고 site 폴더만 GitHub Pages에 배포합니다.
 
 ## 수동 KEY 계산기
 
