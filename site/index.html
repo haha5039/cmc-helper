@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101715">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="description" content="삼성 CMC의 5자리 KEY로 인증코드를 계산하세요. KEY와 코드는 브라우저 안에서만 처리합니다.">
+  <title>CMC KEY 계산기 · CMC Helper</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <a class="skip" href="#main">계산기로 바로 가기</a>
+  <div class="shell">
+    <header class="topbar"><a class="brand" href="./">CMC <span>Helper</span></a><span class="badge"><span class="dot" aria-hidden="true"></span>브라우저 안에서 계산</span></header>
+    <main id="main">
+      <div class="intro"><p class="eyebrow">SAMSUNG CMC</p><h1>KEY 인증코드 계산기</h1><p class="lede">CMC 인증창의 KEY 5자리를 입력하세요.<br>앱 설치나 Shizuku 연결 없이 계산할 수 있어요.</p></div>
+      <noscript><p class="error">계산기를 사용하려면 브라우저에서 JavaScript를 켜 주세요.</p></noscript>
+      <div class="calculator">
+        <section class="card input-card" aria-labelledby="input-title">
+          <h2 id="input-title"><span class="step">1</span>KEY 입력</h2>
+          <form id="key-form" autocomplete="off">
+            <label for="key-input">CMC 화면에 표시된 5자리</label>
+            <input id="key-input" type="text" placeholder="예: 1abcd" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" enterkeyhint="go" aria-describedby="key-hint validation">
+            <p class="hint" id="key-hint">영문·숫자 5자리 · 대문자와 앞뒤 공백은 자동으로 정리해요.</p>
+            <p id="validation" class="error" role="alert" hidden></p>
+            <div class="actions"><button id="calculate" class="primary" type="submit" disabled>인증코드 계산</button><button id="clear" class="secondary" type="button">지우기</button></div>
+          </form>
+          <details class="help"><summary>KEY는 어디서 확인하나요?</summary><ol><li>삼성 CMC의 초기 설정을 완료한 뒤 정보(버전) 화면을 여세요.</li><li><strong>앱 이름을 10번</strong> 누르세요. 버전 번호가 아니라 앱 이름입니다.</li><li>인증창의 <strong>KEY :</strong> 뒤 5자리를 이 계산기에 입력하세요.</li></ol><p>정보 화면이 바로 닫히면 CMC 초기 설정 상태를 먼저 확인하세요.</p></details>
+        </section>
+        <section class="card result-card" aria-labelledby="result-title">
+          <h2 id="result-title"><span class="step">2</span>인증코드 확인</h2>
+          <p class="result-hint" id="result-hint">KEY를 입력한 뒤 계산을 눌러 주세요.</p>
+          <output id="code" class="code empty" aria-label="아직 계산한 인증코드가 없습니다">—</output>
+          <div class="basis"><p id="normalized-key"></p><p id="utc-time">기준 시간은 UTC로 표시됩니다.</p></div>
+          <div class="countdown" id="countdown-box" hidden><span id="countdown" aria-live="off"></span><span class="auto-label">자동 갱신</span></div>
+          <button id="copy" class="primary copy" type="button" disabled>인증코드 복사</button>
+          <p id="copy-status" class="copy-status" role="status" aria-live="polite"></p>
+          <p class="hint">복사한 숫자를 삼성 CMC 인증창에 입력하세요.<br>분이 바뀌면 화면의 코드도 자동으로 갱신됩니다.</p>
+        </section>
+      </div>
+      <aside class="notes"><p><strong>KEY와 코드는 현재 브라우저에서만 처리해요.</strong><br>서버로 전송하거나 계산 내역으로 저장하지 않습니다.</p><p>CMC 9.1.00.15 계산식 기준입니다. 기기의 날짜·시간이 정확해야 하며, 새 KEY가 표시되면 다시 입력해 주세요.</p></aside>
+      <p class="guide-jump"><a href="#manual-guide">발신·수신 수동 전환 가이드 <span aria-hidden="true">↓</span></a></p>
+      <section id="manual-guide" class="guide" aria-labelledby="guide-title">
+        <header class="guide-heading"><p class="eyebrow">MANUAL GUIDE</p><h2 id="guide-title">발신·수신 역할을 직접 바꾸려면</h2><p>CMC 9.1.00.15에서 확인한 인증·역할 예외 준비를 기준으로 설명합니다. 이 웹 페이지는 코드를 계산하며, 휴대폰 설정을 직접 변경하지 않습니다.</p></header>
+        <table class="role-table"><caption>CMC 기기 역할</caption><thead><tr><th scope="col">값</th><th scope="col">역할</th><th scope="col">용도</th></tr></thead><tbody><tr><th scope="row"><code>pd</code></th><td>발신 기기</td><td>이 휴대전화의 전화·문자를 다른 기기에 제공합니다.</td></tr><tr><th scope="row"><code>sd</code></th><td>수신 기기</td><td>다른 휴대전화의 전화·문자를 이 기기에서 받습니다.</td></tr></tbody></table>
+        <div class="guide-notice"><strong>역할 예외 준비와 역할 변경은 별도입니다.</strong><p>휴대전화에 <code>sd</code>를 유지하려면 CMC 내부의 <code>test_flag</code> 역할 예외가 필요합니다. 개발자 화면은 인증을 거쳐 열어야 합니다. <span lang="en">Apply and Reset</span>과 테스트 사용 OFF는 CMC 초기화·재부팅을 요청할 수 있으므로 이 절차에서 사용하지 않습니다.</p></div>
+        <ol class="guide-steps">
+          <li><h3>초기 설정과 원래 역할을 확인합니다.</h3><p>역할을 바꿀 기기에서 ‘다른 기기에서도 전화/문자하기’ 초기 설정을 마칩니다. 아래 상태 확인 명령으로 원래 역할을 기록하세요. CMC 사용을 끄기 전에 다음 인증·역할 예외 준비부터 진행합니다.</p></li>
+          <li><h3>인증 후 테스트 사용을 켭니다.</h3><p>CMC 정보 화면에서 앱 이름을 10번 누릅니다. 표시된 KEY로 위 계산기에서 인증코드를 만들고 삼성 인증창에 입력하세요. 개발자 화면에 들어간 뒤 테스트 사용 스위치를 ON으로 둡니다. 이미 ON이면 끄지 않고 그대로 둡니다. CMC 9.1.00.15에서는 이 인증된 경로가 내부 <code>test_flag</code>를 준비하는 데 중요합니다.</p><p class="hint">DeveloperActivity만 직접 실행하면 화면의 ON 표시와 내부 역할 예외 상태가 다를 수 있습니다. 정보 화면이 바로 닫히면 CMC 초기 설정 상태를 먼저 확인하세요.</p></li>
+          <li><h3>CMC 사용을 끄고 역할 값을 변경합니다.</h3><p>삼성 CMC 화면에서 역할을 바꿀 기기의 통화·메시지 사용을 모두 끕니다. 아래 세 사용 값이 모두 <code>0</code>인지 확인한 뒤 원하는 역할 명령 하나를 실행합니다. 이 과정에서 서버 값이나 글로벌 활성화 값을 강제로 바꾸지 않습니다.</p></li>
+          <li><h3>값이 유지되는지 확인합니다.</h3><p>변경 직후와 약 3초 뒤에 역할을 다시 읽습니다. <code>sd</code>가 <code>pd</code>로 되돌아가면 인증된 역할 예외 준비와 CMC 버전을 확인하세요. 발신으로 돌아가려면 같은 꺼짐 조건에서 <code>pd</code>를 지정합니다. 개발자 테스트 사용 OFF를 역할 전환 버튼처럼 사용하지 마세요.</p></li>
+          <li><h3>CMC에서 기기 연결을 마칩니다.</h3><p>기존 CMC 설정 창을 닫았다 다시 열고, 필요한 초기 설정·삼성 계정 확인·QR 연결과 사용 설정을 진행합니다. 처음 연결을 시험할 때는 두 기기를 같은 삼성 계정과 같은 Wi-Fi에 두면 확인하기 쉽습니다. 역할 값과 실제 연결은 별개이므로 전화와 SMS를 각각 시험하세요.</p></li>
+        </ol>
+        <details class="guide-detail"><summary>수동 변경 명령 보기 · PC ADB / Shizuku shell</summary><div class="detail-body"><p>다음은 PC ADB 기준입니다. 휴대폰에서는 Shizuku에 연결된 shell 환경(rish 등)에서 앞의 <code>adb shell</code>을 제외합니다. 일반 터미널 앱만으로 설정 쓰기 권한이 생기지는 않습니다. 위 인증·역할 예외 준비를 먼저 마친 뒤 사용하세요.</p><h3>1. 원래 역할과 꺼짐 상태 확인</h3><pre tabindex="0" aria-label="원래 역할과 사용 상태 확인 명령"><code>adb shell settings get global cmc_device_type
+adb shell settings get global cmc_activation
+adb shell settings get global cmc_call_activation
+adb shell settings get global cmc_message_activation</code></pre><p>원래 역할을 기록하고, 세 사용 값이 모두 <code>0</code>인지 확인합니다. 사용 중이거나 상태를 읽지 못하면 변경하지 마세요.</p><h3>2. 원하는 명령 하나만 실행</h3><p>수신 기기로 변경:</p><pre tabindex="0" aria-label="수신 역할 변경 명령"><code>adb shell settings put global cmc_device_type sd</code></pre><p>발신 기기로 변경:</p><pre tabindex="0" aria-label="발신 역할 변경 명령"><code>adb shell settings put global cmc_device_type pd</code></pre><h3>3. 적용 직후와 약 3초 뒤 확인</h3><pre tabindex="0" aria-label="현재 역할 확인 명령"><code>adb shell settings get global cmc_device_type</code></pre><p>원하는 값이 유지되는지 확인한 뒤 CMC 화면에서 사용 설정과 기기 연결을 진행합니다. 이 수동 절차는 Helper의 자동 저널·롤백을 대신하지 않으므로, 원래 역할 기록을 남겨 두세요.</p></div></details>
+        <details class="guide-detail"><summary>원래 역할로 복원하려면</summary><div class="detail-body"><p>CMC의 통화·메시지 사용을 모두 끈 뒤, 기록한 원래 역할이 <code>pd</code> 또는 <code>sd</code>라면 위 명령으로 그 값을 다시 지정합니다. 원래 조회 결과가 <code>null</code>로 키가 없었던 경우에는 다음 명령으로 키 부재 상태를 복원합니다.</p><pre tabindex="0" aria-label="원래 없던 역할 키 복원 명령"><code>adb shell settings delete global cmc_device_type</code></pre><p><code>test_flag</code> 해제는 역할 복원과 다른 작업입니다. 재부팅·초기화를 피하려면 개발자 화면의 OFF나 Reset을 직접 누르는 대신, 지원 버전에서 CMC Helper의 ‘역할 예외 해제’ 안내를 확인하세요.</p></div></details>
+        <p class="guide-scope">이 절차의 확인 범위는 CMC 9.1.00.15입니다. 다른 버전은 인증·역할 저장 동작이 다를 수 있습니다.</p>
+      </section>
+    </main>
+    <footer><span>CMC Helper · KEY calculator</span><a href="https://github.com/haha5039/cmc-helper/releases/latest" rel="noreferrer">Helper 앱 보기 <span aria-hidden="true">↗</span></a></footer>
+  </div>
+</body>
+</html>

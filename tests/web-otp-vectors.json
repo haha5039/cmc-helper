@@ -1,0 +1,686 @@
+{
+  "source": "app-preparation/com/haha5039/cmc/CmcOtp.java",
+  "source_sha256": "c95d6e008b4e66bd22ffb74808e0c8775651bf92c5ceeae64499f3188398a724",
+  "vectors": [
+    {
+      "key": "1abcd",
+      "epochMillis": 1793060220000,
+      "code": "1764156171"
+    },
+    {
+      "key": "1abcd",
+      "epochMillis": 1793060279999,
+      "code": "1764156171"
+    },
+    {
+      "key": "1abcd",
+      "epochMillis": 1793060280000,
+      "code": "1762970250"
+    },
+    {
+      "key": "1abcd",
+      "epochMillis": 1798761540000,
+      "code": "977722653"
+    },
+    {
+      "key": "1abcd",
+      "epochMillis": 1798761600000,
+      "code": "1765338982"
+    },
+    {
+      "key": "1abcd",
+      "epochMillis": 1835481599000,
+      "code": "922583013"
+    },
+    {
+      "key": "1abcd",
+      "epochMillis": 1835481600000,
+      "code": "2007620073"
+    },
+    {
+      "key": "1abcd",
+      "epochMillis": 1767225600000,
+      "code": "188973467"
+    },
+    {
+      "key": "wg22f",
+      "epochMillis": 1749023240698,
+      "code": "565004469"
+    },
+    {
+      "key": "ypsht",
+      "epochMillis": 1795962760374,
+      "code": "589741993"
+    },
+    {
+      "key": "0b0w8",
+      "epochMillis": 1766720506268,
+      "code": "1050600149"
+    },
+    {
+      "key": "8zvah",
+      "epochMillis": 1841701095175,
+      "code": "1080137554"
+    },
+    {
+      "key": "g7abt",
+      "epochMillis": 1806806217014,
+      "code": "443261231"
+    },
+    {
+      "key": "5mhsz",
+      "epochMillis": 1822604737368,
+      "code": "1100802034"
+    },
+    {
+      "key": "r7hyv",
+      "epochMillis": 1769763209068,
+      "code": "786471804"
+    },
+    {
+      "key": "yke7f",
+      "epochMillis": 1750999448779,
+      "code": "698544920"
+    },
+    {
+      "key": "mdgoi",
+      "epochMillis": 1847758872827,
+      "code": "434229225"
+    },
+    {
+      "key": "q8fm5",
+      "epochMillis": 1790937131506,
+      "code": "1699577822"
+    },
+    {
+      "key": "bc7tr",
+      "epochMillis": 1793102988474,
+      "code": "2112282880"
+    },
+    {
+      "key": "r7wvl",
+      "epochMillis": 1837069449350,
+      "code": "2075282490"
+    },
+    {
+      "key": "qwm6c",
+      "epochMillis": 1795077151832,
+      "code": "443832815"
+    },
+    {
+      "key": "cwj46",
+      "epochMillis": 1783242287019,
+      "code": "1174165263"
+    },
+    {
+      "key": "ioldq",
+      "epochMillis": 1805170372797,
+      "code": "187268595"
+    },
+    {
+      "key": "dvcu7",
+      "epochMillis": 1780706121617,
+      "code": "799608165"
+    },
+    {
+      "key": "0z2ej",
+      "epochMillis": 1759341767775,
+      "code": "437568577"
+    },
+    {
+      "key": "ym04z",
+      "epochMillis": 1795270889870,
+      "code": "1852900519"
+    },
+    {
+      "key": "y8kwp",
+      "epochMillis": 1791400530659,
+      "code": "483092733"
+    },
+    {
+      "key": "binct",
+      "epochMillis": 1784230568463,
+      "code": "218878279"
+    },
+    {
+      "key": "wo869",
+      "epochMillis": 1785309867227,
+      "code": "1549297804"
+    },
+    {
+      "key": "aio7r",
+      "epochMillis": 1844360066535,
+      "code": "1045536510"
+    },
+    {
+      "key": "ptlfn",
+      "epochMillis": 1791402697624,
+      "code": "373811460"
+    },
+    {
+      "key": "wqmxx",
+      "epochMillis": 1745406272235,
+      "code": "1722933637"
+    },
+    {
+      "key": "5sy8z",
+      "epochMillis": 1797945408561,
+      "code": "1191046157"
+    },
+    {
+      "key": "pa74s",
+      "epochMillis": 1758769692638,
+      "code": "1778268911"
+    },
+    {
+      "key": "lfoev",
+      "epochMillis": 1823952181848,
+      "code": "1588055719"
+    },
+    {
+      "key": "b3r5g",
+      "epochMillis": 1859068225042,
+      "code": "722456227"
+    },
+    {
+      "key": "t9jko",
+      "epochMillis": 1827862057621,
+      "code": "556417101"
+    },
+    {
+      "key": "9zty9",
+      "epochMillis": 1779333783379,
+      "code": "1947104049"
+    },
+    {
+      "key": "bcvox",
+      "epochMillis": 1804242653433,
+      "code": "1418940201"
+    },
+    {
+      "key": "wy42v",
+      "epochMillis": 1769557729518,
+      "code": "250827985"
+    },
+    {
+      "key": "x083t",
+      "epochMillis": 1760875972720,
+      "code": "907565343"
+    },
+    {
+      "key": "3eh17",
+      "epochMillis": 1750108408058,
+      "code": "312816355"
+    },
+    {
+      "key": "qmlp2",
+      "epochMillis": 1827262551091,
+      "code": "2074799541"
+    },
+    {
+      "key": "541tm",
+      "epochMillis": 1861134053669,
+      "code": "39159955"
+    },
+    {
+      "key": "szru2",
+      "epochMillis": 1765522531342,
+      "code": "35824643"
+    },
+    {
+      "key": "m6jtq",
+      "epochMillis": 1763191993015,
+      "code": "1166213646"
+    },
+    {
+      "key": "ni36q",
+      "epochMillis": 1801652743538,
+      "code": "286240486"
+    },
+    {
+      "key": "w96ph",
+      "epochMillis": 1774040826256,
+      "code": "534205803"
+    },
+    {
+      "key": "ibrj0",
+      "epochMillis": 1771461226124,
+      "code": "1905311057"
+    },
+    {
+      "key": "lgnf4",
+      "epochMillis": 1774789240893,
+      "code": "577346027"
+    },
+    {
+      "key": "jtq48",
+      "epochMillis": 1836124299741,
+      "code": "44334155"
+    },
+    {
+      "key": "ewxw2",
+      "epochMillis": 1791431465343,
+      "code": "2061110519"
+    },
+    {
+      "key": "vo95o",
+      "epochMillis": 1861511538690,
+      "code": "1763539005"
+    },
+    {
+      "key": "agb4j",
+      "epochMillis": 1760422677475,
+      "code": "1186995075"
+    },
+    {
+      "key": "txv6x",
+      "epochMillis": 1842584814248,
+      "code": "610690958"
+    },
+    {
+      "key": "ykmnj",
+      "epochMillis": 1800697986604,
+      "code": "1433005865"
+    },
+    {
+      "key": "iaimj",
+      "epochMillis": 1824255275758,
+      "code": "55529791"
+    },
+    {
+      "key": "sr7b5",
+      "epochMillis": 1758244619207,
+      "code": "258785291"
+    },
+    {
+      "key": "ydvod",
+      "epochMillis": 1853520709272,
+      "code": "1844510159"
+    },
+    {
+      "key": "roog9",
+      "epochMillis": 1839117350526,
+      "code": "396529428"
+    },
+    {
+      "key": "9v9wd",
+      "epochMillis": 1759195388641,
+      "code": "4136252"
+    },
+    {
+      "key": "bqybq",
+      "epochMillis": 1830554495783,
+      "code": "1922228107"
+    },
+    {
+      "key": "ji1b3",
+      "epochMillis": 1860394198229,
+      "code": "1671119932"
+    },
+    {
+      "key": "jbwho",
+      "epochMillis": 1751035694337,
+      "code": "742792191"
+    },
+    {
+      "key": "nus1x",
+      "epochMillis": 1853754298990,
+      "code": "113985818"
+    },
+    {
+      "key": "c2dj2",
+      "epochMillis": 1765953487868,
+      "code": "1384114184"
+    },
+    {
+      "key": "69ui7",
+      "epochMillis": 1821353216245,
+      "code": "1559532618"
+    },
+    {
+      "key": "035k3",
+      "epochMillis": 1745235937316,
+      "code": "892649167"
+    },
+    {
+      "key": "2f615",
+      "epochMillis": 1761590970449,
+      "code": "1160101595"
+    },
+    {
+      "key": "81kjh",
+      "epochMillis": 1847734345945,
+      "code": "1142060744"
+    },
+    {
+      "key": "1zhdn",
+      "epochMillis": 1800532995142,
+      "code": "1971494264"
+    },
+    {
+      "key": "d1wnc",
+      "epochMillis": 1817677215922,
+      "code": "198125691"
+    },
+    {
+      "key": "br4in",
+      "epochMillis": 1772042470365,
+      "code": "1980144934"
+    },
+    {
+      "key": "pidvr",
+      "epochMillis": 1820286123781,
+      "code": "1705302595"
+    },
+    {
+      "key": "sk9n7",
+      "epochMillis": 1769908875357,
+      "code": "1571794421"
+    },
+    {
+      "key": "neo4b",
+      "epochMillis": 1778088299155,
+      "code": "51000281"
+    },
+    {
+      "key": "6s2nr",
+      "epochMillis": 1853389369512,
+      "code": "687162590"
+    },
+    {
+      "key": "zxkmm",
+      "epochMillis": 1838058448085,
+      "code": "943874788"
+    },
+    {
+      "key": "2ftiu",
+      "epochMillis": 1774765883101,
+      "code": "153667670"
+    },
+    {
+      "key": "rhl9c",
+      "epochMillis": 1818229717957,
+      "code": "776429995"
+    },
+    {
+      "key": "21ayl",
+      "epochMillis": 1852755898747,
+      "code": "500702707"
+    },
+    {
+      "key": "dd5mk",
+      "epochMillis": 1836786369612,
+      "code": "1360189715"
+    },
+    {
+      "key": "jszpn",
+      "epochMillis": 1823270883978,
+      "code": "1319040016"
+    },
+    {
+      "key": "ci4ri",
+      "epochMillis": 1831656057239,
+      "code": "699146761"
+    },
+    {
+      "key": "ub131",
+      "epochMillis": 1794412078709,
+      "code": "1799282967"
+    },
+    {
+      "key": "5zhbi",
+      "epochMillis": 1823962168822,
+      "code": "1516384186"
+    },
+    {
+      "key": "h4054",
+      "epochMillis": 1760234881423,
+      "code": "2088423050"
+    },
+    {
+      "key": "mb6ik",
+      "epochMillis": 1770551373862,
+      "code": "225194534"
+    },
+    {
+      "key": "zolzq",
+      "epochMillis": 1861148928639,
+      "code": "855794623"
+    },
+    {
+      "key": "60zni",
+      "epochMillis": 1823491096578,
+      "code": "179215316"
+    },
+    {
+      "key": "d2zhe",
+      "epochMillis": 1759954621708,
+      "code": "1278063401"
+    },
+    {
+      "key": "py7is",
+      "epochMillis": 1760733322266,
+      "code": "2069372906"
+    },
+    {
+      "key": "ct2av",
+      "epochMillis": 1815018771446,
+      "code": "1452775390"
+    },
+    {
+      "key": "kfwpc",
+      "epochMillis": 1797313909152,
+      "code": "638591177"
+    },
+    {
+      "key": "lnoxm",
+      "epochMillis": 1774009757157,
+      "code": "205195575"
+    },
+    {
+      "key": "8moku",
+      "epochMillis": 1823921640099,
+      "code": "1124038955"
+    },
+    {
+      "key": "wkgc3",
+      "epochMillis": 1839233892501,
+      "code": "1011787397"
+    },
+    {
+      "key": "vbftj",
+      "epochMillis": 1849394959003,
+      "code": "573107612"
+    },
+    {
+      "key": "c7ds8",
+      "epochMillis": 1795696774855,
+      "code": "703556342"
+    },
+    {
+      "key": "66df0",
+      "epochMillis": 1823638800303,
+      "code": "1686783772"
+    },
+    {
+      "key": "usarc",
+      "epochMillis": 1858831418529,
+      "code": "1563597659"
+    },
+    {
+      "key": "8vjo1",
+      "epochMillis": 1830666509112,
+      "code": "1796329944"
+    },
+    {
+      "key": "yoph6",
+      "epochMillis": 1835285154684,
+      "code": "1365612870"
+    },
+    {
+      "key": "fwway",
+      "epochMillis": 1736414451311,
+      "code": "2075728042"
+    },
+    {
+      "key": "ecejd",
+      "epochMillis": 1826342392153,
+      "code": "1044042684"
+    },
+    {
+      "key": "yk00h",
+      "epochMillis": 1793837253711,
+      "code": "226652702"
+    },
+    {
+      "key": "zgdow",
+      "epochMillis": 1845579386226,
+      "code": "764913039"
+    },
+    {
+      "key": "pbq4q",
+      "epochMillis": 1766922482698,
+      "code": "1664117142"
+    },
+    {
+      "key": "7vdxq",
+      "epochMillis": 1789602651806,
+      "code": "2137780612"
+    },
+    {
+      "key": "23bgl",
+      "epochMillis": 1769044070312,
+      "code": "508790449"
+    },
+    {
+      "key": "vrktr",
+      "epochMillis": 1822701529479,
+      "code": "1540489974"
+    },
+    {
+      "key": "excjj",
+      "epochMillis": 1754444885153,
+      "code": "394821162"
+    },
+    {
+      "key": "e5yxo",
+      "epochMillis": 1794283039711,
+      "code": "920911116"
+    },
+    {
+      "key": "tgpmd",
+      "epochMillis": 1850779679897,
+      "code": "1570664031"
+    },
+    {
+      "key": "3k2u0",
+      "epochMillis": 1788926548760,
+      "code": "1815726773"
+    },
+    {
+      "key": "pprhn",
+      "epochMillis": 1753367165573,
+      "code": "450717257"
+    },
+    {
+      "key": "zgzdq",
+      "epochMillis": 1815981745225,
+      "code": "1772705739"
+    },
+    {
+      "key": "rswhd",
+      "epochMillis": 1834421541086,
+      "code": "1225225193"
+    },
+    {
+      "key": "ecl6z",
+      "epochMillis": 1814381922378,
+      "code": "1941858708"
+    },
+    {
+      "key": "p8d5b",
+      "epochMillis": 1827303414708,
+      "code": "774743290"
+    },
+    {
+      "key": "fu0im",
+      "epochMillis": 1820721391149,
+      "code": "1588153820"
+    },
+    {
+      "key": "gpwjc",
+      "epochMillis": 1817290468793,
+      "code": "840043111"
+    },
+    {
+      "key": "zh0xd",
+      "epochMillis": 1817789558680,
+      "code": "1018893010"
+    },
+    {
+      "key": "a34ii",
+      "epochMillis": 1780630233499,
+      "code": "236357709"
+    },
+    {
+      "key": "r3s6p",
+      "epochMillis": 1861042254258,
+      "code": "742331055"
+    },
+    {
+      "key": "gm3cu",
+      "epochMillis": 1752916638028,
+      "code": "776265368"
+    },
+    {
+      "key": "g06pz",
+      "epochMillis": 1839410990751,
+      "code": "833990712"
+    },
+    {
+      "key": "becna",
+      "epochMillis": 1799210070792,
+      "code": "2011936244"
+    },
+    {
+      "key": "z8uqm",
+      "epochMillis": 1737310282429,
+      "code": "698598014"
+    },
+    {
+      "key": "wm8ys",
+      "epochMillis": 1837397371956,
+      "code": "459693049"
+    },
+    {
+      "key": "tlred",
+      "epochMillis": 1844321721895,
+      "code": "87988028"
+    },
+    {
+      "key": "m0hgv",
+      "epochMillis": 1834674654318,
+      "code": "609852283"
+    },
+    {
+      "key": "ibd02",
+      "epochMillis": 1784935971359,
+      "code": "1899624080"
+    },
+    {
+      "key": "4ny6f",
+      "epochMillis": 1777798805351,
+      "code": "1506112656"
+    },
+    {
+      "key": "ftefc",
+      "epochMillis": 1855622874995,
+      "code": "1241916830"
+    },
+    {
+      "key": "ajt0u",
+      "epochMillis": 1859540434525,
+      "code": "2029204439"
+    }
+  ]
+}

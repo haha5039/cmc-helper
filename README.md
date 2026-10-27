@@ -4,6 +4,12 @@
 
 [1.4.0 APK Release](https://github.com/haha5039/cmc-helper/releases/tag/v1.4.0)
 
+## 웹 KEY 계산기
+
+[GitHub Pages용 계산기 소스](site/index.html)와 [실행·배포 안내](docs/web-calculator.md)를 추가했습니다. 브라우저 안에서 KEY를 계산하며 서버 전송이나 계산 내역 저장은 하지 않습니다. 앱과 일치하는 Java 참조값 136개를 검사합니다. 하단에는 현재 test_flag 기반의 수동 pd/sd 전환·복원 가이드가 있습니다.
+
+현재 저장소의 Pages 활성화는 GitHub 요금제 제한으로 보류되어 있습니다. 저장소 공개 설정은 유지합니다. `.github/workflows/pages.yml`은 계산 검사를 수행하고 Pages 활성화 이후 site 폴더만 배포합니다.
+
 ## 수동 KEY 계산기
 
 앱 상단의 **KEY 인증코드 계산기**를 엽니다. 삼성 CMC 인증창에 표시된 영문·숫자 5자리 KEY를 입력하고 **인증코드 계산 → 인증코드 복사**를 누릅니다. 계산기 자체에는 Shizuku 연결이나 별도 권한이 필요하지 않습니다.
