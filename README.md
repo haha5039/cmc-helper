@@ -1,62 +1,61 @@
 # CMC Helper
 
-갤럭시 휴대폰의 삼성 CMC를 수신 기기(`sd`) 또는 발신 기기(`pd`)로 준비하는 앱입니다. **1.1.0부터 Shizuku 연결 후 앱 버튼으로 준비·역할 변경·복원·역할 예외 해제를 실행**할 수 있습니다. 시스템 전체의 태블릿 모드나 화면 배치는 바꾸지 않습니다.
+갤럭시 휴대폰의 삼성 CMC를 발신 기기(pd) 또는 수신 기기(sd) 역할로 전환하는 Helper입니다. 시스템 전체의 태블릿 모드나 화면 배치는 바꾸지 않습니다.
 
-[APK 프리릴리스](https://github.com/haha5039/cmc-helper/releases/tag/v1.1.0)
+[1.2.0 APK 프리릴리스](https://github.com/haha5039/cmc-helper/releases/tag/v1.2.0)
 
-## 휴대전화만으로 사용하기
+## 사용 순서
 
-1. APK를 설치합니다. 기존 1.0과 패키지·서명 인증서가 같아 업데이트할 수 있습니다.
-2. 휴대전화의 개발자 옵션에서 무선 디버깅을 켭니다. Shizuku 앱 안내에 따라 페어링하고 시작합니다.
-3. CMC Helper에서 **Shizuku 연결**을 누르고 권한을 허용합니다. 실제 엔진 UID가 표시됩니다.
-4. 잠금을 해제하고 **수신 기능 준비**를 누릅니다. 삼성 CMC 화면이 전환되는 동안 화면을 조작하지 않습니다.
-5. 삼성 CMC의 전체·통화·메시지 사용을 끈 뒤 **이 기기를 수신 기기로**를 누릅니다. 이미 같은 역할이면 쓰지 않습니다.
-6. **삼성 CMC 설정 열기**에서 같은 삼성 계정, 발신 휴대폰, QR 기기 연결을 확인합니다. 처음에는 두 기기를 같은 Wi-Fi에 연결합니다.
-7. 실제 전화와 별도 SMS를 보내 수신 여부를 각각 확인합니다. 사용 설정이 켜져 있다는 표시만으로 연결·수신 성공을 판정하지 않습니다.
+1. 휴대전화에서 Shizuku를 무선 디버깅으로 시작하고 이 앱의 권한을 허용합니다. 기존 승인이 있으면 앱을 열 때 엔진을 다시 연결합니다. 설정 작업을 자동 재실행하지는 않습니다.
+2. 잠금을 해제하고 원하는 발신·수신 역할 버튼을 누릅니다.
+3. 변경 내용을 확인하면 삼성 CMC의 실제 통화·메시지 사용 스위치를 끄고 필요한 준비 후 역할을 적용합니다. 같은 역할이거나 취소하면 사용을 끄지 않습니다.
+4. 삼성 CMC 설정을 열어 기기 등록·사용 재개·QR 연결을 진행합니다. 앱은 사용 설정을 자동으로 다시 켜지 않습니다.
+5. 실제 전화와 별도 SMS로 수신을 확인합니다. 역할 값·사용 설정 표시가 연결 완료를 뜻하지는 않습니다.
 
-Shizuku는 Android 11 이상에서 무선 디버깅으로 PC 없이 시작할 수 있습니다. 재부팅 후에는 다시 시작해야 합니다. [공식 시작 안내](https://shizuku.rikka.app/guide/setup/)
+새 기기에서 역할 예외가 준비되지 않았다면 삼성 CMC 초기 설정을 먼저 완료해야 합니다. 삼성 정보 화면은 초기 설정 상태가 꺼져 있으면 스스로 종료합니다. 이미 준비된 역할은 꺼진 상태에서도 변경을 시도하고 검증합니다.
 
-## 지원 범위와 권한
+## 개발자 화면 바로가기
 
-무선 디버깅으로 시작한 Shizuku는 shell UID 2000, 루트로 시작한 서버는 UID 0입니다. 앱이 실제 모드를 구분합니다. 루트 없이 쓰려면 Shizuku를 무선 디버깅으로 시작하세요.
+앱의 **준비 해제 및 도움말 → 삼성 CMC 개발자 화면 열기**에서 실행합니다. 삼성 정보 화면 인증을 거쳐 실제 DeveloperActivity를 열어 두며, 앱은 스위치·Reset 버튼을 누르지 않습니다.
 
-## 역할 변경과 예외 ON/OFF
+인증 없이 바로 실행하면 내부 test_flag가 해제될 수 있어 인증 경로를 사용합니다. 삼성 화면은 진입 시 기존 개발자 체크 상태를 반영할 수 있습니다. 그 화면에서 OFF/Apply and Reset을 누르면 CMC 초기화나 재부팅이 요청될 수 있습니다. 초기 설정 전에는 먼저 삼성 CMC 설정을 완료하라는 안내를 표시합니다.
 
-- **수신 기능 준비:** 삼성 정보 화면의 인증된 경로로 내부 `test_flag`를 켭니다.
-- **수신/발신 기기:** 원래 값을 기록하고 쓰기 후 3초간 확인합니다. 실패 시 복원하며 외부에서 바뀐 값은 덮어쓰지 않습니다.
-- **원래 역할 복원:** 최초 쓰기 전에 보관한 값으로 복원합니다. 원래 키가 없던 상태도 구분합니다.
-- **역할 예외 해제:** CMC 사용이 모두 꺼져 있고 `pd`일 때만 허용합니다. 삼성 기본 OFF·Reset 동작은 사용하지 않습니다.
+## 1.2.0에서 고친 문제
 
-예외가 꺼지면 휴대폰의 `sd`를 삼성 CMC가 기본 `pd`로 되돌립니다. 켜져 있으면 두 역할을 허용합니다. 표시용 개발자 스위치와 내부 `test_flag`는 별개입니다.
+- CMC 사용 중 전환이 차단되는 조건을 앱에서 처리합니다. 사용자 확인 후 실제 native 사용 스위치를 끄며, 글로벌 활성 값만 직접 0으로 쓰지 않습니다.
+- 실행 중인 MainActivity를 startActivitySync로 다시 열다 대기가 끝나지 않는 경로를 제거했습니다. 기존 작업 ID와 제한 시간 안의 비동기 화면 확인을 사용합니다.
+- 수신 예외 준비는 필요한 경우 사용 중지보다 먼저 처리합니다. 정보 화면이 초기 설정 상태 때문에 닫히는 조건도 안내합니다.
+- 역할 적용 후 CMC가 소유한 오래된 설정 창만 정리합니다. CMC 데이터 삭제나 강제 종료로 갱신하지 않습니다.
+- 전환 결과를 버튼 옆에도 표시하고 오류 Toast를 추가했습니다.
 
-## Shizuku 구현
+## 권한과 지원 범위
 
-UserService의 IPC는 고정 역할 쓰기와 고정 준비 작업만 제공합니다. 입력 문자열을 셸 코드로 실행하지 않습니다. 시간·출력 길이를 제한하고 요청 ID가 맞는 완료 결과만 받습니다. 버튼 작업은 직렬화하며 Activity 재생성 시 작업을 재전송하지 않습니다.
+Shizuku는 Android 11 이상에서 무선 디버깅으로 PC 없이 시작할 수 있고, 재부팅 후 다시 시작해야 합니다. [공식 안내](https://shizuku.rikka.app/guide/setup/)
 
-준비 버튼은 `am instrument --no-restart`로 실행 중인 앱에 자체 계측을 붙입니다. 숨겨진 시스템 API를 사용하는 화면 실행은 Shizuku 엔진에서 처리하고, 일반 앱의 일회성 UiAutomation이 삼성 화면을 조작합니다. 요청 ID와 Helper 자체 작업 ID를 확인합니다. 무재시작 경로가 실패해도 앱을 종료하는 계측 방식으로 자동 대체하지 않습니다.
+## 원리와 보호 동작
 
-무재시작 동작은 [Android 16 AOSP ActivityThread](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android16-release/core/java/android/app/ActivityThread.java)의 `handleInstrumentWithoutRestart`와 종료 처리를 참고했습니다. Samsung 펌웨어의 새 Shizuku 경로는 아직 시험하지 않았습니다.
+삼성 CMC는 실제 기기 기본 역할과 저장된 역할이 같거나 내부 test_flag가 참일 때 허용합니다. 휴대폰 기본 역할은 pd 그대로입니다. 역할 예외를 끄면 sd를 지정해도 삼성 CMC가 pd로 되돌립니다.
 
-## 개발과 검사
+역할 쓰기 전 원래 값(키 부재 포함)을 기록하고, 적용 후 3초간 확인합니다. 실패 복원과 외부 변경 보호를 유지합니다. 모든 실제 역할 쓰기는 CMC가 꺼져 있음을 다시 확인한 뒤 실행합니다.
+
+Shizuku 엔진에는 고정 대상·명령만 제공하고 요청 ID를 확인합니다. 자체 계측은 --no-restart와 제한 시간을 사용하며 앱을 종료하는 방식으로 자동 대체하지 않습니다. 개발자 화면 열기는 화면을 유지하고, 준비·전환은 Helper로 돌아옵니다.
+
+## 검사와 한계
+
+## 빌드
 
 ```sh
 python3 tools/check-host.py
 python3 tools/build.py
 ```
 
-JDK 17과 Android SDK platform/build-tools 36을 사용합니다. `JAVA_HOME`, `ANDROID_HOME`, `CMC_SIGNING_HELPER`로 경로를 지정할 수 있습니다. 의존성 해시는 `app/dependencies.json`으로 확인하며 라이선스는 APK assets와 소스에 포함합니다.
+JDK 17과 Android SDK platform/build-tools 36을 사용합니다. JAVA_HOME, ANDROID_HOME, CMC_SIGNING_HELPER로 경로를 지정할 수 있습니다. Shizuku 13.1.5 의존성은 app/dependencies.json의 SHA-256으로 검증하고 라이선스를 APK assets에 포함합니다.
 
-서명은 기존 local signing helper helper의 비공개 설정을 외부에서 사용합니다. 없거나 인증서가 다르면 실패하며 대체 키를 만들지 않습니다.
+서명은 외부의 기존 local signing helper signing helper와 비공개 설정을 사용합니다. 없거나 인증서가 다르면 실패하며 새 키를 만들지 않습니다.
 
 ```text
-인증서 SHA-256
+필수 인증서 SHA-256
 fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c
 ```
 
-## 기존 ADB 방식 (선택)
-
-`python3 tools/device.py install|prepare|receiver|sender|restore|disable-exception`을 사용할 수 있습니다. 실제 실행에서는 작업 이름 하나를 지정합니다. 여러 기기는 `--serial`을 추가합니다. 역할 스크립트는 쓰기 동안만 WRITE_SECURE_SETTINGS를 부여하고 회수하며, 원래 있던 사용자 승인은 유지합니다. Shizuku 앱 버튼에는 이 PC 명령이 필요하지 않습니다.
-
-## 기록
-
-참고: [Shizuku API](https://github.com/RikkaApps/Shizuku-API), [OneUIX CMC 훅](https://github.com/SoClear/OneUIX/blob/6ccbb71fe81464eaeb396de89160cd948b500d58/hook/src/main/java/io/github/soclear/oneuix/hook/MdecService.kt).
+기존 PC 방식은 tools/device.py에 남아 있지만 앱의 Shizuku 전환·개발자 버튼에는 필요하지 않습니다. 키·비공개 설정·원본 삼성 APK·디컴파일 소스·계정 정보·전체 로그는 배포하지 않습니다.

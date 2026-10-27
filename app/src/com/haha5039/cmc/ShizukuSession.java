@@ -31,10 +31,10 @@ final class ShizukuSession implements RoleStore.Writer {
         this.observer = observer;
         args = new Shizuku.UserServiceArgs(new ComponentName(context, CmcUserService.class))
                 .tag("cmc-phone-controls").processNameSuffix("cmc_engine")
-                .daemon(false).debuggable(false).version(2);
+                .daemon(false).debuggable(false).version(5);
     }
     void start() {
-        Shizuku.addBinderReceivedListenerSticky(() -> main.post(this::refresh));
+        Shizuku.addBinderReceivedListenerSticky(() -> main.post(() -> { problem = ""; refresh(); }));
         Shizuku.addBinderDeadListener(() -> main.post(() -> {
             invalidate();
             available = false;
@@ -65,6 +65,8 @@ final class ShizukuSession implements RoleStore.Writer {
             problem = "Shizuku 상태를 확인하지 못했습니다. 다시 연결하세요.";
         }
         observer.run();
+        // An existing approval only reconnects the fixed engine; it never replays a mutation.
+        if (granted && !binding && !requesting && service == null && problem.isEmpty()) bind();
     }
     void authorize() {
         if (binding || requesting) return;
@@ -178,6 +180,32 @@ final class ShizukuSession implements RoleStore.Writer {
     }
     int launchNative(String request, boolean developer, int task) throws Exception {
         return requireService().launchNative(request, developer, task);
+    }
+    void prepareRole(String role, String request) throws IOException {
+        if (!"pd".equals(role) && !"sd".equals(role)) throw new IOException("지원하지 않는 역할");
+        try {
+            String result = requireService().prepareRole(role, request);
+            if (!CommandSpec.completed(result, "role_" + role, request))
+                throw new IOException("전환 준비를 완료하지 못해 역할 적용 단계로 진행하지 않았습니다. 현재 설정을 확인하세요.\n"
+                        + (result == null ? "Shizuku 응답 없음" : result));
+        } catch (android.os.RemoteException error) { throw new IOException("전환 준비 중 Shizuku 연결이 끊겼습니다. 현재 설정을 확인하세요.", error); }
+    }
+    String openDeveloper(String request) throws IOException {
+        try {
+            String result = requireService().openDeveloper(request);
+            if (!CommandSpec.completed(result, "developer", request))
+                throw new IOException("개발자 화면 열기를 완료하지 못했습니다.\n" + (result == null ? "Shizuku 응답 없음" : result));
+            return "삼성 CMC 개발자 화면을 열었습니다. 화면에서 필요한 항목을 직접 확인하세요.";
+        } catch (android.os.RemoteException error) { throw new IOException("개발자 화면 실행 중 Shizuku 연결이 끊겼습니다.", error); }
+    }
+    String refreshCmcUi() {
+        try {
+            String result = requireService().refreshCmcUi();
+            return result != null && result.startsWith("UI_REFRESHED:") ? ""
+                    : "\n역할은 변경했지만 기존 CMC 설정 창을 정리하지 못했습니다. 창을 닫고 다시 열어 주세요.";
+        } catch (Exception error) {
+            return "\n역할은 변경했습니다. 기존 CMC 설정 창이 남아 있으면 닫고 다시 열어 주세요.";
+        }
     }
     private ICmcService requireService() throws IOException {
         ICmcService target = service;

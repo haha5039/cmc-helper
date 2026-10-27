@@ -45,6 +45,29 @@ public final class BridgeChecks {
             check(!CommandSpec.completed("PREPARATION_FAILED:\n"+response(enable), enable, REQUEST));
             check(!CommandSpec.completed(null, enable, REQUEST));
         }
+        for (String role : new String[]{"sd","pd"}) {
+            String operation = "role_" + role;
+            String[] command = CommandSpec.preparation(operation,REQUEST);
+            check(Arrays.asList(command).contains(operation));
+            check(Arrays.asList(command).contains("--no-restart"));
+            String result = response(true).replace("PREPARED:","ROLE_READY:"+role);
+            check(CommandSpec.completed(result,operation,REQUEST));
+            check(!CommandSpec.completed(result,"role_"+("sd".equals(role)?"pd":"sd"),REQUEST));
+            check(!CommandSpec.completed(result.replace(REQUEST,"ffffffffffffffffffffffffffffffff"),operation,REQUEST));
+            check(!CommandSpec.completed("PREPARATION_FAILED:\n"+result,operation,REQUEST));
+            check(!CommandSpec.completed(response(true),operation,REQUEST));
+        }
+        try { CommandSpec.preparation("role_x",REQUEST); throw new AssertionError(); }
+        catch (IllegalArgumentException expected) { passed++; }
+        String developer = response(true).replace("PREPARED:","DEVELOPER_OPENED:");
+        check(Arrays.asList(CommandSpec.preparation("developer",REQUEST)).contains("developer"));
+        check(CommandSpec.completed(developer,"developer",REQUEST));
+        check(!CommandSpec.completed(developer,"prepare",REQUEST));
+        check(!CommandSpec.completed(developer,"role_pd",REQUEST));
+        check(!CommandSpec.completed(developer.replace(REQUEST,"ffffffffffffffffffffffffffffffff"),"developer",REQUEST));
+        check(!CommandSpec.completed(developer.replace("permission_after=-1","permission_after=0"),"developer",REQUEST));
+        try { CommandSpec.preparation("DeveloperActivity",REQUEST); throw new AssertionError(); }
+        catch (IllegalArgumentException expected) { passed++; }
         String java = System.getProperty("java.home") + "/bin/java";
         String classpath = System.getProperty("java.class.path");
         String fixture = "com.haha5039.cmc.BridgeFixture";

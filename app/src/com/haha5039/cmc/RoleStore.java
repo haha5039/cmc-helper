@@ -181,7 +181,7 @@ final class RoleStore {
                         + safeMessage(rollbackFailure);
             }
             String nativeSetup = "sd".equals(target)
-                    ? " 수신 역할이 유지되지 않으면 네이티브 CMC 준비가 필요합니다." : "";
+                    ? " 수신 역할이 유지되지 않으면 삼성 CMC 초기 설정을 먼저 완료하고 수신 기능 준비를 실행하세요." : "";
             journal.lastResult = "역할 변경을 완료하지 못했습니다. " + safeMessage(failure) + " "
                     + recovery + nativeSetup;
             try {

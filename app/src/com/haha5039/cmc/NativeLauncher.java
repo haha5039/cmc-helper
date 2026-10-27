@@ -8,6 +8,25 @@ import java.util.List;
 
 /** Hidden platform calls run exclusively inside the already authorized shell UserService. */
 final class NativeLauncher {
+    static int closeCmcSettings() throws Exception {
+        int uid = android.os.Process.myUid();
+        if (uid != 2000 && uid != 0) throw new SecurityException("Shizuku 엔진에서만 실행합니다.");
+        Class<?> iface = Class.forName("android.app.IActivityTaskManager");
+        Object atm = Class.forName("android.app.ActivityTaskManager").getMethod("getService").invoke(null);
+        List<?> tasks = (List<?>) iface.getMethod("getTasks", int.class, boolean.class, boolean.class, int.class)
+                .invoke(atm, 64, false, false, 0);
+        int closed = 0;
+        String cmc = "com.samsung.android.mdecservice";
+        for (Object item : tasks) {
+            ActivityManager.RunningTaskInfo task = (ActivityManager.RunningTaskInfo) item;
+            ComponentName intent = task.baseIntent == null ? null : task.baseIntent.getComponent();
+            if (task.baseActivity == null || task.topActivity == null || intent == null
+                    || !cmc.equals(task.baseActivity.getPackageName()) || !cmc.equals(task.topActivity.getPackageName())
+                    || !cmc.equals(intent.getPackageName())) continue;
+            if (Boolean.TRUE.equals(iface.getMethod("removeTask", int.class).invoke(atm, task.taskId))) closed++;
+        }
+        return closed;
+    }
     static int open(boolean developer, int taskId) throws Exception {
         int uid = android.os.Process.myUid();
         if (uid != 2000 && uid != 0) throw new SecurityException("Shizuku 엔진에서만 실행합니다.");

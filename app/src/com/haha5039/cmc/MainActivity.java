@@ -35,14 +35,16 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
     private static final int WARNING = Color.rgb(255, 209, 155);
     private static final String SHIZUKU_PACKAGE = "moe.shizuku.privileged.api";
     private static final String SUPPORTED_CMC = "지원: Android 16 이상 · 삼성 CMC 9.1.00.15 (910015100)";
+    // Controller messages survive Activity recreation. Do not toast a retained error again.
+    private static String lastToastedFailure = "";
     private CmcApplication controller;
     private RoleStore.Snapshot current;
     private TextView roleStatus, activationStatus, cmcStatus, advice, backupStatus;
-    private TextView connectionStatus, preparationStatus, prepStatus, resultStatus, transactionStatus;
+    private TextView connectionStatus, preparationStatus, prepStatus, resultStatus, roleResultStatus, transactionStatus;
     private ProgressBar progress;
-    private Button receiver, sender, restore, refresh, openNative, connect, prepareReceiver, disableException;
-    private AlertDialog disableDialog;
-    private boolean operationBusy;
+    private Button receiver, sender, restore, refresh, openNative, connect, prepareReceiver, disableException, openDeveloper;
+    private AlertDialog disableDialog, roleDialog, developerDialog;
+    private boolean operationBusy, developerSetupDialog;
     private final List<Button> operationButtons = new ArrayList<>();
 
     @Override public void onCreate(Bundle state) {
@@ -102,40 +104,45 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
         refresh = button(summary, "상태 새로고침", "refresh_status", false, () -> controller.refresh());
         operationButtons.add(refresh);
 
-        LinearLayout preparation = card(content, "2 · 수신 기능 준비", 14);
-        add(preparation, text("잠금을 해제한 뒤 준비를 실행하세요. 삼성 CMC의 역할 예외를 켭니다(ON). 완료 후 아래에서 수신 기기 역할을 적용하세요.", 14, MUTED), 8);
-        preparationStatus = identifiedText(preparation, SUPPORTED_CMC, 13, MUTED, "status_preparation_support");
-        prepareReceiver = button(preparation, "수신 기능 준비", "prepare_receiver", true, () -> controller.prepare(true));
-        prepStatus = identifiedText(preparation, "아직 준비 결과가 없습니다.", 13, MUTED, "preparation_result");
-        operationButtons.add(prepareReceiver);
-
-        LinearLayout roles = card(content, "3 · CMC 기기 역할", 14);
+        LinearLayout roles = card(content, "2 · CMC 기기 역할", 14);
         add(roles, text("삼성 CMC의 발신·수신 역할을 바꿉니다. 시스템의 태블릿 모드나 화면 배치를 바꾸는 기능은 아닙니다.", 14, MUTED), 8);
-        add(roles, text("다른 역할로 바꾸기 전에는 삼성 CMC의 전체·통화·메시지 사용을 모두 꺼 주세요. 이미 같은 역할이면 설정을 바꾸지 않습니다.", 14, MUTED), 8);
-        receiver = button(roles, "이 기기를 수신 기기로", "role_sd", true, () -> controller.apply("sd"));
+        add(roles, text("다른 역할을 선택하면 먼저 변경 내용을 확인합니다. Shizuku와 지원 버전에서는 CMC 통화·메시지 사용을 자동으로 끄고 필요한 준비를 함께 진행합니다. 이미 같은 역할이면 설정을 바꾸지 않습니다.", 14, MUTED), 8);
+        receiver = button(roles, "이 기기를 수신 기기로", "role_sd", true, () -> requestRole("sd"));
         add(roles, text("다른 휴대전화의 전화·메시지를 받는 역할", 12, MUTED), 4);
-        sender = button(roles, "이 기기를 발신 기기로", "role_pd", false, () -> controller.apply("pd"));
+        sender = button(roles, "이 기기를 발신 기기로", "role_pd", false, () -> requestRole("pd"));
         add(roles, text("전화·메시지를 다른 기기에 제공하는 역할", 12, MUTED), 4);
         restore = button(roles, "원래 역할 복원", "restore_original", false, () -> controller.restore());
+        roleResultStatus = identifiedText(roles, "", 14, ACCENT, "role_operation_result");
+        roleResultStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         backupStatus = identifiedText(roles, "", 12, MUTED, "status_backup");
         transactionStatus = identifiedText(roles, "", 13, WARNING, "status_transaction");
         operationButtons.add(receiver);
         operationButtons.add(sender);
         operationButtons.add(restore);
 
-        LinearLayout nativeCard = card(content, "4 · 삼성 CMC에서 기기 연결", 14);
+        LinearLayout nativeCard = card(content, "3 · 삼성 CMC에서 기기 연결", 14);
         add(nativeCard, text("삼성 CMC를 열어 삼성 계정과 연결 기기를 확인하세요. 초기 설정이나 기기 등록이 필요하면 화면의 기기 연결·QR 코드 안내를 따라 진행하세요.", 14, MUTED), 8);
         openNative = button(nativeCard, "삼성 CMC 설정 열기", "open_native_cmc", true, this::openNative);
         button(nativeCard, "QR 코드로 기기 연결하기", "show_qr_pairing", false, this::showQrHelp);
         add(nativeCard, text("위 상태는 CMC의 설정값입니다. 실제 연결·통화·문자 수신 여부는 삼성 CMC와 실제 전화·문자로 확인하세요.", 13, MUTED), 12);
         operationButtons.add(openNative);
 
+        LinearLayout preparation = card(content, "수신 기능 준비 · 별도 실행", 14);
+        add(preparation, text("수신 역할로 변경할 때 필요한 준비도 함께 진행합니다. 준비만 따로 실행하려면 잠금을 해제한 뒤 누르세요. 삼성 CMC의 역할 예외를 켭니다(ON).", 14, MUTED), 8);
+        preparationStatus = identifiedText(preparation, SUPPORTED_CMC, 13, MUTED, "status_preparation_support");
+        prepareReceiver = button(preparation, "수신 기능 준비", "prepare_receiver", true, () -> controller.prepare(true));
+        prepStatus = identifiedText(preparation, "아직 준비 결과가 없습니다.", 13, MUTED, "preparation_result");
+        operationButtons.add(prepareReceiver);
+
         LinearLayout maintenance = card(content, "준비 해제 및 도움말", 14);
         add(maintenance, text("수신 기능 준비가 더 필요 없으면 CMC 사용을 끄고 발신 기기로 바꾼 뒤 역할 예외를 해제하세요.", 14, MUTED), 8);
         disableException = button(maintenance, "역할 예외 해제", "disable_exception", false, this::confirmDisableException);
         operationButtons.add(disableException);
+        openDeveloper = button(maintenance, "삼성 CMC 개발자 화면 열기", "open_developer", false, this::confirmOpenDeveloper);
+        operationButtons.add(openDeveloper);
+        add(maintenance, text("삼성 CMC의 인증 절차를 거쳐 개발자 화면을 엽니다.", 12, MUTED), 6);
         add(maintenance, text("재부팅 후에는 무선 디버깅으로 Shizuku를 다시 시작해야 할 수 있습니다. CMC 준비와 적용한 역할은 Shizuku 연결과 별도로 저장됩니다.", 13, MUTED), 14);
-        add(maintenance, text("새 Shizuku 경로는 아직 기기에서 동작을 검증하지 않았습니다. 준비 결과는 마지막 작업 기록입니다.", 13, WARNING), 10);
+        add(maintenance, text("준비 결과는 마지막 작업 기록입니다. 실제 통화·문자 수신은 기기 연결 후 별도로 확인하세요.", 13, MUTED), 10);
         button(maintenance, "자세한 상태 보기", "show_status_details", false, this::showDetails);
 
         TextView footer = text(Build.MANUFACTURER + " " + Build.MODEL + " · Android "
@@ -164,6 +171,7 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
                 && snapshot.cmcInstalled && snapshot.cmcEnabled;
         setAvailable(prepareReceiver, canPrepare);
         setAvailable(disableException, canPrepare);
+        setAvailable(openDeveloper, canPrepare);
         if (snapshot == null)
             preparationStatus.setText(SUPPORTED_CMC + "\nCMC 버전을 확인하고 있습니다.");
         else if (!supported)
@@ -172,10 +180,19 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
             preparationStatus.setText(SUPPORTED_CMC + "\nShizuku에 먼저 연결하세요.");
         else preparationStatus.setText(SUPPORTED_CMC + "\n잠금을 해제한 상태에서 진행하세요.");
         updateDisableConfirmation();
+        updateRoleDialog();
+        updateDeveloperDialog();
         String result = message == null ? "" : message;
         resultStatus.setText(result);
         resultStatus.setTextColor(error ? WARNING : ACCENT);
         resultStatus.setVisibility(result.isEmpty() ? View.GONE : View.VISIBLE);
+        roleResultStatus.setText(result);
+        roleResultStatus.setTextColor(error ? WARNING : ACCENT);
+        roleResultStatus.setVisibility(result.isEmpty() ? View.GONE : View.VISIBLE);
+        if (!busy && error && !result.trim().isEmpty() && !result.equals(lastToastedFailure)) {
+            lastToastedFailure = result;
+            Toast.makeText(this, result, Toast.LENGTH_LONG).show();
+        }
         if (snapshot == null) {
             roleStatus.setText(busy ? "확인 중…" : "상태 확인 필요");
             cmcStatus.setText("삼성 CMC 상태를 새로고침하세요");
@@ -200,7 +217,9 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
         else if (snapshot.externalChange)
             advice.setText("외부 역할 변경을 감지했습니다. 보호를 위해 자동으로 덮어쓰지 않습니다.");
         else if (snapshot.active())
-            advice.setText("CMC 사용 설정이 켜져 있습니다. 다른 역할로 바꾸려면 먼저 삼성 CMC 사용을 꺼 주세요.");
+            advice.setText(ready && supported
+                    ? "역할 변경을 확인하면 CMC 통화·메시지 사용을 자동으로 끄고 진행합니다."
+                    : "CMC 사용 설정이 켜져 있습니다. 역할 버튼에서 Shizuku 연결 또는 직접 끄는 방법을 확인하세요.");
         else if ("sd".equals(snapshot.role))
             advice.setText("수신 역할이 설정되어 있습니다. 다음 단계는 삼성 CMC에서 기기 연결입니다.");
         else advice.setText("수신 역할이 발신으로 되돌아가면 ‘수신 기능 준비’를 실행하세요.");
@@ -213,10 +232,10 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
         transactionStatus.setVisibility(transactionStatus.getText().length() == 0 ? View.GONE : View.VISIBLE);
         prepStatus.setText(snapshot.preparationResult);
         boolean canWriteRole = ready || snapshot.permissionGranted;
-        // A same-role request is still available without a write connection, even while active.
-        // RoleStore remains responsible for all activation, journaling, and conflict guards.
-        setAvailable(receiver, !busy && (canWriteRole || "sd".equals(snapshot.role)));
-        setAvailable(sender, !busy && (canWriteRole || "pd".equals(snapshot.role)));
+        // Keep role buttons available for no-ops and actionable connection/manual-off help.
+        // The controller and RoleStore enforce the native-off, journal, and write guards.
+        setAvailable(receiver, !busy);
+        setAvailable(sender, !busy);
         setAvailable(restore, !busy && snapshot.hasOriginal && (canWriteRole
                 || java.util.Objects.equals(snapshot.role, snapshot.originalRole)));
     }
@@ -226,6 +245,87 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
         if ("0".equals(value.trim())) return "꺼짐";
         if ("1".equals(value.trim())) return "켜짐";
         return "확인 필요 (" + value + ")";
+    }
+
+    private void requestRole(String role) {
+        if (operationBusy || (roleDialog != null && roleDialog.isShowing())) return;
+        if (current == null) {
+            showTextDialog("상태를 먼저 확인하세요", "상태를 새로고침한 뒤 역할 버튼을 다시 눌러 주세요.",
+                    "role_switch_status_required", null);
+            return;
+        }
+        if (role.equals(current.role)) {
+            controller.apply(role); // Same-role requests never need confirmation or a write.
+            return;
+        }
+        boolean automatic = controller.shizukuReady() && controller.preparationSupported();
+        if ((current.active() && !automatic)
+                || (!controller.shizukuReady() && !current.permissionGranted)) {
+            showRoleConnectionHelp();
+            return;
+        }
+        String target = RoleStore.roleName(role);
+        String workflow = automatic
+                ? "현재 삼성 CMC의 통화·메시지 사용을 자동으로 끈 다음 필요한 준비와 역할 변경을 진행합니다. 기기 잠금을 해제하고 진행 중에는 화면을 조작하지 마세요."
+                : "삼성 CMC의 전체·통화·메시지 사용이 꺼져 있는지 다시 확인한 뒤 역할을 변경합니다.";
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setTitle(target + "로 바꿀까요?")
+                .setMessage("대상 역할: " + target + " (" + role + ")\n\n" + workflow
+                        + "\n\n변경 후 삼성 CMC 등록이나 QR 기기 연결을 다시 진행해야 할 수 있습니다. CMC 사용을 자동으로 다시 켜지 않습니다."
+                        + "\n\n데이터 초기화나 재부팅은 하지 않습니다.")
+                .setNegativeButton("취소", null)
+                .setPositiveButton(target + "로 변경", (dialog, which) -> {
+                    if (!operationBusy) controller.applyConfirmed(role);
+                });
+        showRoleDialog(builder, "sd".equals(role) ? "role_sd_confirm" : "role_pd_confirm");
+    }
+
+    private void showRoleConnectionHelp() {
+        boolean needsConnection = !controller.shizukuReady();
+        String message;
+        if (needsConnection) {
+            message = current != null && current.active()
+                    ? "CMC의 통화·메시지 사용이 켜져 있습니다. 자동으로 끄고 역할을 바꾸려면 Shizuku를 먼저 연결하세요."
+                    : "역할을 변경하려면 Shizuku를 먼저 연결하세요.";
+            message += "\n\n이 앱의 Shizuku 권한을 허용한 뒤 역할 버튼을 다시 눌러 주세요.";
+        } else {
+            message = "현재 CMC 버전에서는 사용 설정을 자동으로 끌 수 없습니다. 삼성 CMC에서 전체·통화·메시지 사용을 모두 끈 뒤 역할 버튼을 다시 눌러 주세요.\n\n" + SUPPORTED_CMC;
+        }
+        if (needsConnection && current != null && current.active())
+            message += "\n\n기존 역할 변경 권한이 있다면 삼성 CMC에서 전체·통화·메시지 사용을 직접 끈 뒤 진행할 수도 있습니다.";
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setTitle(needsConnection ? "Shizuku 연결이 필요합니다" : "삼성 CMC를 먼저 꺼 주세요")
+                .setMessage(message)
+                .setNegativeButton("취소", null);
+        if (needsConnection) {
+            builder.setPositiveButton("Shizuku 연결", (dialog, which) -> {
+                if (!operationBusy) controller.connectShizuku();
+            });
+            builder.setNeutralButton("삼성 CMC 열기", (dialog, which) -> {
+                if (!operationBusy) openNative();
+            });
+        } else builder.setPositiveButton("삼성 CMC 열기", (dialog, which) -> {
+            if (!operationBusy) openNative();
+        });
+        showRoleDialog(builder, needsConnection ? "role_switch_connect" : "role_switch_open_native");
+    }
+
+    private void showRoleDialog(AlertDialog.Builder builder, String confirmDescription) {
+        roleDialog = builder.create();
+        roleDialog.setOnDismissListener(dialog -> roleDialog = null);
+        roleDialog.show();
+        roleDialog.getButton(AlertDialog.BUTTON_POSITIVE).setContentDescription(confirmDescription);
+        roleDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setContentDescription("role_switch_cancel");
+        Button alternate = roleDialog.getButton(AlertDialog.BUTTON_NEUTRAL);
+        if (alternate != null) alternate.setContentDescription("role_switch_open_native");
+        updateRoleDialog();
+    }
+
+    private void updateRoleDialog() {
+        if (roleDialog == null || !roleDialog.isShowing()) return;
+        setAvailable(roleDialog.getButton(AlertDialog.BUTTON_POSITIVE), !operationBusy);
+        Button alternate = roleDialog.getButton(AlertDialog.BUTTON_NEUTRAL);
+        if (alternate != null) setAvailable(alternate, !operationBusy);
     }
 
     private void openNative() {
@@ -261,8 +361,8 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
                 "1. 휴대전화 설정의 개발자 옵션에서 ‘무선 디버깅’을 켭니다.\n\n"
                 + "2. Shizuku 앱의 무선 디버깅 안내에 따라 페어링하고 Shizuku를 시작합니다.\n\n"
                 + "3. CMC Helper로 돌아와 ‘Shizuku 연결’을 누르고 이 앱의 권한 요청을 허용합니다.\n\n"
-                + "4. 기기 잠금을 해제한 상태에서 ‘수신 기능 준비’를 누릅니다. 실행 중에는 화면을 조작하지 마세요.\n\n"
-                + "5. 삼성 CMC의 전체·통화·메시지 사용을 모두 끈 뒤 ‘이 기기를 수신 기기로’를 누릅니다. 삼성 CMC를 열어 기기 연결을 진행하세요.\n\n"
+                + "4. 잠금을 해제하고 ‘이 기기를 수신 기기로’를 누른 뒤 변경 내용을 확인합니다. 지원 버전에서는 CMC 통화·메시지 사용을 자동으로 끄고 수신 준비와 역할 변경을 진행합니다. 실행 중에는 화면을 조작하지 마세요.\n\n"
+                + "5. 삼성 CMC를 열어 등록·QR 기기 연결과 사용 설정을 직접 진행하세요. 역할 변경 후 CMC 사용을 자동으로 다시 켜지 않습니다.\n\n"
                 + "Shizuku를 시작한 뒤에는 PC나 터미널 명령 없이 앱의 버튼으로 진행할 수 있습니다.",
                 "shizuku_instructions", null);
     }
@@ -273,6 +373,50 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
                 + "2. 연결할 다른 휴대전화에서도 삼성 CMC를 열고 ‘기기 연결’의 QR 코드 안내를 따르세요. QR 코드 표시·스캔은 각 기기의 CMC 화면에서 진행합니다.\n\n"
                 + "3. 연결 기기 목록과 사용 설정을 확인한 뒤 실제 전화와 문자로 수신을 확인하세요.",
                 "qr_pairing_instructions", null);
+    }
+
+    private void confirmOpenDeveloper() {
+        if (!canOpenDeveloper() || (developerDialog != null && developerDialog.isShowing())) return;
+        final boolean setup = needsCmcSetup();
+        developerSetupDialog = setup;
+        developerDialog = new AlertDialog.Builder(this)
+                .setTitle(setup ? "삼성 CMC 초기 설정이 필요합니다" : "삼성 CMC 개발자 화면 열기")
+                .setMessage(setup
+                        ? "먼저 삼성 CMC를 열어 초기 설정을 완료하세요. 이 앱으로 돌아와 상태를 새로고침한 뒤 개발자 화면 열기를 다시 눌러 주세요."
+                        : "인증을 거쳐 삼성 CMC의 개발자 화면을 엽니다. 이 바로가기는 화면의 스위치나 버튼을 누르지 않습니다.\n\n"
+                            + "화면을 열 때 기존 체크 상태에 따라 역할 예외에 영향이 생길 수 있습니다.\n\n"
+                            + "화면의 OFF 또는 ‘Apply and Reset’을 누르면 CMC가 초기화되거나 기기가 재부팅될 수 있습니다.")
+                .setNegativeButton("취소", null)
+                .setPositiveButton(setup ? "삼성 CMC 열기" : "개발자 화면 열기", (dialog, which) -> {
+                    if (setup) {
+                        if (!operationBusy) openNative();
+                    } else if (canOpenDeveloper() && !needsCmcSetup()) {
+                        controller.openDeveloper();
+                    } else {
+                        Toast.makeText(this, "CMC 초기 설정과 Shizuku 연결 상태를 확인하세요.", Toast.LENGTH_LONG).show();
+                    }
+                }).create();
+        developerDialog.setOnDismissListener(dialog -> developerDialog = null);
+        developerDialog.show();
+        developerDialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setContentDescription(setup ? "open_developer_setup" : "open_developer_confirm");
+        developerDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setContentDescription("open_developer_cancel");
+        updateDeveloperDialog();
+    }
+
+    private boolean canOpenDeveloper() {
+        return !operationBusy && controller.shizukuReady() && controller.preparationSupported()
+                && current != null && current.cmcInstalled && current.cmcEnabled;
+    }
+
+    private boolean needsCmcSetup() {
+        return current != null && "0".equals(current.oobe);
+    }
+
+    private void updateDeveloperDialog() {
+        if (developerDialog != null && developerDialog.isShowing())
+            setAvailable(developerDialog.getButton(AlertDialog.BUTTON_POSITIVE), !operationBusy
+                    && (developerSetupDialog || (canOpenDeveloper() && !needsCmcSetup())));
     }
 
     private void confirmDisableException() {

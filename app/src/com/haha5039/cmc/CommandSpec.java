@@ -10,10 +10,16 @@ final class CommandSpec {
         return new String[]{"settings", "put", "global", "cmc_device_type", value};
     }
     static String[] preparation(boolean enable, String request) {
+        return preparation(enable ? "prepare" : "disable", request);
+    }
+    static String[] preparation(String operation, String request) {
+        if (!"prepare".equals(operation) && !"disable".equals(operation)
+                && !"role_sd".equals(operation) && !"role_pd".equals(operation) && !"developer".equals(operation))
+            throw new IllegalArgumentException("Unsupported preparation");
         if (request == null || !request.matches("[a-f0-9]{32}"))
             throw new IllegalArgumentException("Invalid request identifier");
         return new String[]{"am", "instrument", "-w", "--no-restart", "--no-hidden-api-checks",
-                "-e", "operation", enable ? "prepare" : "disable",
+                "-e", "operation", operation,
                 "-e", "request_id", request, "-e", "bridge", "shizuku", PACKAGE + "/.PrepareInstrumentation"};
     }
     static boolean wrote(String role, int exit, String output) {
@@ -23,12 +29,19 @@ final class CommandSpec {
         return role == null ? body.matches("Deleted [01] rows") : body.isEmpty();
     }
     static boolean completed(String output, boolean enable, String request) {
-        preparation(enable, request); // Validate even when the output is malformed.
+        return completed(output, enable ? "prepare" : "disable", request);
+    }
+    static boolean completed(String output, String operation, String request) {
+        preparation(operation, request);
         if (output == null || output.contains("BRIDGE_FAILED:") || output.contains("PREPARATION_FAILED:")
                 || output.contains("INSTRUMENTATION_FAILED") || output.contains("INSTRUMENTATION_ABORTED")) return false;
+        String prefix = "prepare".equals(operation) ? "PREPARED:"
+                : "disable".equals(operation) ? "EXCEPTION_DISABLED:"
+                : "developer".equals(operation) ? "DEVELOPER_OPENED:"
+                : "ROLE_READY:" + operation.substring(5);
         return output.contains("INSTRUMENTATION_RESULT: request_id=" + request + "\n")
                 && output.contains("INSTRUMENTATION_RESULT: result="
-                        + (enable ? "PREPARED:" : "EXCEPTION_DISABLED:"))
+                        + prefix)
                 && output.contains("INSTRUMENTATION_RESULT: game_permission_after=-1\n")
                 && output.contains("INSTRUMENTATION_CODE: -1\n");
     }

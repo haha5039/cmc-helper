@@ -23,12 +23,33 @@ public final class CmcUserService extends ICmcService.Stub {
         } catch (Exception error) { return "WRITE_FAILED: " + error.getMessage(); }
     }
     @Override public synchronized String prepare(boolean enable, String requestId) {
+        return runPreparation(enable ? "prepare" : "disable", requestId);
+    }
+    @Override public synchronized String prepareRole(String role, String requestId) {
+        CommandSpec.role(role);
+        if (role == null) throw new IllegalArgumentException("Role required");
+        return runPreparation("role_" + role, requestId);
+    }
+    @Override public synchronized String openDeveloper(String requestId) {
+        return runPreparation("developer", requestId);
+    }
+    @Override public synchronized String refreshCmcUi() {
         requireShell();
         try {
-            CommandSpec.preparation(enable, requestId);
+            for (String key : new String[]{"cmc_activation", "cmc_call_activation", "cmc_message_activation"}) {
+                BoundedCommand.Result result = BoundedCommand.run(5000, "settings", "get", "global", key);
+                if (result.exit != 0 || !"0".equals(result.output.trim())) return "UI_BUSY";
+            }
+            return "UI_REFRESHED:" + NativeLauncher.closeCmcSettings();
+        } catch (Exception error) { return "UI_FAILED"; }
+    }
+    private String runPreparation(String operation, String requestId) {
+        requireShell();
+        try {
+            CommandSpec.preparation(operation, requestId);
             activeRequest = requestId;
             requestDeadline = android.os.SystemClock.elapsedRealtime() + 75000;
-            BoundedCommand.Result result = BoundedCommand.run(75000, CommandSpec.preparation(enable, requestId));
+            BoundedCommand.Result result = BoundedCommand.run(75000, CommandSpec.preparation(operation, requestId));
             if (result.exit != 0) return "BRIDGE_FAILED: 자체 준비 실행을 완료하지 못했습니다.\n" + result.output;
             return result.output;
         } catch (Exception error) { return "BRIDGE_FAILED: " + error.getMessage(); }
