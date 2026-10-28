@@ -6,9 +6,9 @@
 
 ## 웹 KEY 계산기
 
-[GitHub Pages용 계산기 소스](site/index.html)와 [실행·배포 안내](docs/web-calculator.md)를 추가했습니다. 브라우저 안에서 KEY를 계산하며 서버 전송이나 계산 내역 저장은 하지 않습니다. 앱과 일치하는 Java 참조값 136개를 검사합니다. 하단에는 현재 test_flag 기반의 수동 pd/sd 전환·복원 가이드가 있습니다.
+[웹 계산기 바로가기](https://haha5039.github.io/cmc-helper/)
 
-[웹 계산기 열기](https://haha5039.github.io/cmc-helper/). `.github/workflows/pages.yml`은 계산 검사를 수행하고 site 폴더만 GitHub Pages에 배포합니다.
+브라우저에서 CMC KEY의 인증코드를 계산·복사할 수 있습니다. KEY와 코드는 서버로 전송하거나 계산 내역으로 저장하지 않습니다. 페이지 하단에는 인증된 개발자 화면을 통한 발신·수신 전환 안내가 있습니다.
 
 ## 수동 KEY 계산기
 
