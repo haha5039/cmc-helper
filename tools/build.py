@@ -11,14 +11,22 @@ import subprocess
 import sys
 import tempfile
 import zipfile
+from guide_assets import package_guide
 
 ROOT = Path(__file__).resolve().parents[1]
-JDK = Path(os.environ.get("JAVA_HOME") or os.environ["JAVA_HOME"])
-SDK = Path(os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT") or os.environ["ANDROID_HOME"])
+JDK = Path(os.environ["JAVA_HOME"]).expanduser()
+SDK = Path(os.environ.get("ANDROID_HOME") or os.environ["ANDROID_SDK_ROOT"]).expanduser()
 BUILD_TOOLS = SDK / "build-tools/36.0.0"
 ANDROID_JAR = SDK / "platforms/android-36/android.jar"
-SIGNER = Path(os.environ.get("CMC_SIGNING_HELPER") or os.environ["CMC_SIGNING_HELPER"])
+SIGNER = Path(os.environ["CMC_SIGNING_HELPER"]).expanduser() if os.environ.get("CMC_SIGNING_HELPER") else None
 CERTIFICATE = "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c"
+
+
+def redact_output(value):
+    locations={str(ROOT):"<project>",str(JDK):"<jdk>",str(SDK):"<android-sdk>",str(Path.home()):"<home>"}
+    for original,label in sorted(locations.items(),key=lambda item:len(item[0]),reverse=True):
+        value=value.replace(original,label)
+    return value
 
 
 def run(command, env, *, private=False):
@@ -26,15 +34,17 @@ def run(command, env, *, private=False):
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     if result.returncode:
         if not private and result.stdout:
-            print(result.stdout, file=sys.stderr)
+            print(redact_output(result.stdout), file=sys.stderr)
         # The signing helper's configuration and output are deliberately not inspected.
         raise RuntimeError(f"{Path(str(command[0])).name} failed (exit {result.returncode})")
     if not private and result.stdout.strip():
-        print(result.stdout.strip())
+        print(redact_output(result.stdout.strip()))
     return result.stdout
 
 
 def sign_apk(unsigned, signed, env):
+    if SIGNER is None or not SIGNER.is_file():
+        raise RuntimeError("Set CMC_SIGNING_HELPER to the private signing helper; no fallback key is allowed")
     run([sys.executable, SIGNER, "--input", unsigned, "--output", signed], env, private=True)
     verification = run([BUILD_TOOLS / "apksigner", "verify", "--verbose", "--print-certs", signed],
                        env, private=True)
@@ -53,16 +63,18 @@ def main():
     parser.add_argument("--extra-java", type=Path, action="append", default=[],
                         help="Additional Java source file/directory; repeat as needed")
     args = parser.parse_args()
+    if SIGNER is None:
+        raise RuntimeError("CMC_SIGNING_HELPER is required; no fallback key is allowed")
     for required in (JDK / "bin/javac", ANDROID_JAR, SIGNER,
                      *(BUILD_TOOLS / name for name in ("aapt2", "aidl", "d8", "zipalign", "apksigner"))):
         if not required.is_file():
-            raise RuntimeError(f"Required build/signing tool unavailable: {required}")
+            raise RuntimeError("Required build/signing tool unavailable; check the local environment configuration")
     env = os.environ.copy()
     env["JAVA_HOME"] = str(JDK)
     env["PATH"] = str(JDK / "bin") + os.pathsep + env.get("PATH", "")
     args.work_dir.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="run-", dir=args.work_dir))
-    print(f"Build directory: {work}", flush=True)
+    print("Preparing local build workspace", flush=True)
     generated, classes, dex = (work / name for name in ("generated", "classes", "dex"))
     for directory in (generated, classes, dex):
         directory.mkdir()
@@ -89,10 +101,12 @@ def main():
              "-o", generated, source], env)
     resource_zip = work / "resources.zip"
     run([BUILD_TOOLS / "aapt2", "compile", "--dir", ROOT / "app/res", "-o", resource_zip], env)
+    assets = work / "assets"
+    package_guide(ROOT, assets)
     resources = work / "resources.apk"
     run([BUILD_TOOLS / "aapt2", "link", "-o", resources, "-I", ANDROID_JAR,
          "--manifest", ROOT / "app/AndroidManifest.xml", "--min-sdk-version", "33",
-         "--target-sdk-version", "36", "--java", generated, "-A", ROOT / "app/assets", resource_zip], env)
+         "--target-sdk-version", "36", "--java", generated, "-A", assets, resource_zip], env)
 
     # Parent-owned setup and tests are compiled recursively if present. EXTRA accepts
     # os.pathsep-separated additional source roots, as does repeated --extra-java.
@@ -135,7 +149,7 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     os.replace(signed, args.output)
     print(f"Verified certificate SHA-256: {CERTIFICATE}")
-    print(f"Signed APK: {args.output.resolve()}")
+    print("Signed APK written to the requested output; required certificate verified.")
 
 
 if __name__ == "__main__":

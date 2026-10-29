@@ -3,6 +3,7 @@ package com.haha5039.cmc;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ClipData;
+import android.content.Intent;
 import android.content.ClipboardManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -74,6 +75,9 @@ public final class OtpCalculatorActivity extends Activity {
         title.setAccessibilityHeading(true);
         add(content,title,20);
         add(content,text("삼성 CMC 화면에 표시된 KEY를 입력하세요. Shizuku 연결 없이 기기 안에서 계산합니다.",14,MUTED),8);
+
+        button(content,"발신·수신 수동 설정 가이드",R.id.open_manual_guide,false,
+                () -> startActivity(new Intent(this,ManualGuideActivity.class)));
 
         LinearLayout inputCard = card(content);
         TextView keyLabel = text("화면의 KEY 5자리",15,TEXT);

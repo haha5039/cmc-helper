@@ -73,6 +73,21 @@ public final class BridgeChecks {
         check(!CommandSpec.completed(developer.replace("permission_after=-1","permission_after=0"),"developer",REQUEST));
         try { CommandSpec.preparation("DeveloperActivity",REQUEST); throw new AssertionError(); }
         catch (IllegalArgumentException expected) { passed++; }
+        for (String role : new String[]{"sd","pd"}) {
+            String op="native_"+role;
+            String nativeReply=response(true).replace("PREPARED:","NATIVE_APPLY_REQUESTED:"+role);
+            check(Arrays.asList(CommandSpec.preparation(op,REQUEST)).contains(op));
+            check(CommandSpec.completed(nativeReply,op,REQUEST));
+            check(!CommandSpec.completed(nativeReply,"native_"+(role.equals("sd")?"pd":"sd"),REQUEST));
+            check(!CommandSpec.completed(nativeReply.replace("REQUESTED:"+role,"REQUESTED:"+role+"X"),op,REQUEST));
+            String rejected=nativeReply.replace("NATIVE_APPLY_REQUESTED:","NATIVE_NOT_APPLIED:");
+            check(CommandSpec.nativeNotApplied(rejected,role,REQUEST));
+            check(!CommandSpec.completed(rejected,op,REQUEST));
+            check(!CommandSpec.nativeNotApplied(rejected.replace("NATIVE_NOT_APPLIED:","NATIVE_APPLY_UNCERTAIN:"),role,REQUEST));
+            check(!CommandSpec.nativeNotApplied(rejected.replace(REQUEST,"ffffffffffffffffffffffffffffffff"),role,REQUEST));
+            check(!CommandSpec.nativeNotApplied(rejected.replace("permission_after=-1","permission_after=0"),role,REQUEST));
+            check(!CommandSpec.nativeNotApplied(rejected.replace("INSTRUMENTATION_CODE: -1\n",""),role,REQUEST));
+        }
         String java = System.getProperty("java.home") + "/bin/java";
         String classpath = System.getProperty("java.class.path");
         String fixture = "com.haha5039.cmc.BridgeFixture";

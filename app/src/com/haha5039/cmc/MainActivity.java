@@ -19,6 +19,8 @@ import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.RadioGroup;
+import android.widget.RadioButton;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -42,8 +44,8 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
     private TextView roleStatus, activationStatus, cmcStatus, advice, backupStatus;
     private TextView connectionStatus, preparationStatus, prepStatus, resultStatus, roleResultStatus, transactionStatus;
     private ProgressBar progress;
-    private Button receiver, sender, restore, refresh, openNative, connect, prepareReceiver, disableException, openDeveloper;
-    private AlertDialog disableDialog, roleDialog, developerDialog, informationDialog;
+    private Button receiver, sender, restore, refresh, openNative, connect, prepareReceiver, disableException, openDeveloper, nativeApply, acceptNative;
+    private AlertDialog disableDialog, roleDialog, developerDialog, informationDialog, nativeApplyDialog, nativePendingDialog;
     private boolean operationBusy, developerSetupDialog;
     private final List<Button> operationButtons = new ArrayList<>();
 
@@ -117,6 +119,11 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
         sender = button(roles, "이 기기를 발신 기기로", R.id.role_pd, false, () -> requestRole("pd"));
         add(roles, text("전화·메시지를 다른 기기에 제공하는 역할", 12, MUTED), 4);
         restore = button(roles, "원래 역할 복원", R.id.restore_original, false, () -> controller.restore());
+        add(roles,text("일반 전환은 재부팅 없이 역할 값을 적용합니다. 개발자 화면의 선택값은 별도로 보일 수 있습니다.",12,MUTED),8);
+        nativeApply=button(roles,"가이드 방식 전환 · 초기화/재부팅",R.id.native_apply_open,false,this::requestNativeApply);
+        add(roles,text("인증 후 Device Type 선택과 Apply and Reset APP까지 진행합니다. CMC 등록을 다시 설정할 준비가 필요합니다.",12,MUTED),6);
+        acceptNative=button(roles,"현재 상태로 적용 대기 기록 정리",R.id.native_pending_resolve,false,this::confirmAcceptNative);
+        operationButtons.add(nativeApply);operationButtons.add(acceptNative);
         roleResultStatus = identifiedText(roles, "", 14, ACCENT, R.id.role_operation_result);
         roleResultStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         backupStatus = identifiedText(roles, "", 12, MUTED, R.id.status_backup);
@@ -160,7 +167,7 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
     @Override protected void onStop() { controller.detach(this); super.onStop(); }
 
     @Override protected void onDestroy() {
-        for (AlertDialog dialog : new AlertDialog[]{disableDialog,roleDialog,developerDialog,informationDialog})
+        for (AlertDialog dialog : new AlertDialog[]{disableDialog,roleDialog,developerDialog,informationDialog,nativeApplyDialog,nativePendingDialog})
             if (dialog != null) dialog.dismiss();
         super.onDestroy();
     }
@@ -178,8 +185,18 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
         for (Button button : operationButtons) {
             setAvailable(button, !busy);
         }
+        boolean nativePending=snapshot!=null && snapshot.nativeResetPending;
         boolean canPrepare = !busy && ready && supported && snapshot != null
-                && snapshot.cmcInstalled && snapshot.cmcEnabled;
+                && snapshot.cmcInstalled && snapshot.cmcEnabled && !nativePending;
+        setAvailable(nativeApply,canPrepare);
+        boolean external=snapshot!=null && snapshot.externalChange && !snapshot.transactionPending;
+        acceptNative.setVisibility(nativePending || external ? View.VISIBLE : View.GONE);
+        acceptNative.setText(nativePending?"현재 상태로 적용 대기 기록 정리":"현재 역할로 기록 기준 맞추기");
+        setAvailable(acceptNative,!busy && (nativePending || external));
+        if (nativeApplyDialog!=null && nativeApplyDialog.isShowing())
+            setAvailable(nativeApplyDialog.getButton(AlertDialog.BUTTON_POSITIVE),canPrepare && "1".equals(snapshot.oobe));
+        if (nativePendingDialog!=null && nativePendingDialog.isShowing())
+            setAvailable(nativePendingDialog.getButton(AlertDialog.BUTTON_POSITIVE),!busy && (nativePending || external));
         setAvailable(prepareReceiver, canPrepare);
         setAvailable(disableException, canPrepare);
         setAvailable(openDeveloper, canPrepare);
@@ -193,6 +210,7 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
         updateDisableConfirmation();
         updateRoleDialog();
         updateDeveloperDialog();
+        if (busy && !error) lastToastedFailure="";
         String result = message == null ? "" : message;
         resultStatus.setText(result);
         resultStatus.setTextColor(error ? WARNING : ACCENT);
@@ -227,10 +245,12 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
             advice.setText("이 기기에서 삼성 CMC를 찾을 수 없습니다. CMC가 설치된 지원 갤럭시에서 역할을 변경하세요. KEY 계산기는 사용할 수 있습니다.");
         else if (!snapshot.cmcEnabled)
             advice.setText("삼성 CMC가 비활성화되어 있습니다. 기기 설정에서 활성화한 뒤 다시 확인하세요.");
+        else if (snapshot.nativeResetPending)
+            advice.setText("초기화 적용 요청이 기록되어 있습니다. 재부팅 후 상태를 확인하세요. 요청은 자동 재실행하지 않습니다.");
         else if (snapshot.transactionPending)
             advice.setText("중단된 작업 기록이 있습니다. 현재 상태를 확인하고 원래 역할을 복원하세요.");
         else if (snapshot.externalChange)
-            advice.setText("외부 역할 변경을 감지했습니다. 보호를 위해 자동으로 덮어쓰지 않습니다.");
+            advice.setText("외부 역할 변경을 감지했습니다. 현재 역할을 앱의 관리 기준으로 확인한 뒤 계속할 수 있습니다.");
         else if (snapshot.active())
             advice.setText(ready && supported
                     ? "역할 변경을 확인하면 CMC 통화·메시지 사용을 자동으로 끄고 진행합니다."
@@ -242,7 +262,8 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
                 ? "저장된 원래 역할: " + RoleStore.roleName(snapshot.originalRole)
                     + (snapshot.originalPresent ? "" : " · 키가 없던 상태까지 복원")
                 : "아직 저장된 원래 역할이 없습니다. 실제 변경 직전에 자동으로 보관합니다.");
-        transactionStatus.setText(snapshot.transactionPending ? "복원 확인 필요 · 중단 기록 보존 중"
+        transactionStatus.setText(snapshot.nativeResetPending ? "초기화 적용 결과 확인 대기 중"
+                : snapshot.transactionPending ? "복원 확인 필요 · 중단 기록 보존 중"
                 : snapshot.externalChange ? "외부 변경 보호 중" : "");
         transactionStatus.setVisibility(transactionStatus.getText().length() == 0 ? View.GONE : View.VISIBLE);
         prepStatus.setText(snapshot.preparationResult);
@@ -250,9 +271,9 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
         setAvailable(openNative, !busy && snapshot.cmcInstalled && snapshot.cmcEnabled);
         // Keep role buttons available for no-ops and actionable connection/manual-off help.
         // The controller and RoleStore enforce the native-off, journal, and write guards.
-        setAvailable(receiver, !busy);
-        setAvailable(sender, !busy);
-        setAvailable(restore, !busy && snapshot.hasOriginal && (canWriteRole
+        setAvailable(receiver, !busy && !nativePending);
+        setAvailable(sender, !busy && !nativePending);
+        setAvailable(restore, !busy && !nativePending && !snapshot.externalChange && snapshot.hasOriginal && (canWriteRole
                 || java.util.Objects.equals(snapshot.role, snapshot.originalRole)));
     }
 
@@ -301,6 +322,60 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
                     if (!operationBusy) controller.applyConfirmed(role);
                 });
         showRoleDialog(builder, "sd".equals(role) ? R.id.role_sd_confirm : R.id.role_pd_confirm);
+    }
+
+    private void requestNativeApply() {
+        if (operationBusy || current==null || current.nativeResetPending || !controller.shizukuReady()
+                || !controller.preparationSupported() || !current.cmcInstalled || !current.cmcEnabled) return;
+        if (current.externalChange && !current.transactionPending) { confirmAcceptNative();return; }
+        if (!"1".equals(current.oobe)) {
+            showTextDialog("삼성 CMC 초기 설정이 필요합니다",
+                    "먼저 삼성 CMC 초기 설정을 완료하세요. 기존 발신 폰을 이 기기로 교체한다는 창이 나오면 연결에 영향을 주므로 변경 여부를 직접 결정해야 합니다.",R.id.native_setup_help,null);
+            return;
+        }
+        if (nativeApplyDialog!=null && nativeApplyDialog.isShowing()) return;
+        LinearLayout content=column();content.setPadding(dp(22),dp(8),dp(22),dp(8));
+        add(content,text("선택한 역할을 개발자 화면에서 지정하고 Apply and Reset APP을 누릅니다. CMC의 등록·설정이 초기화되고 휴대전화가 재부팅될 수 있습니다. 기존 발신 폰과 연결 기기의 연동에 영향을 줄 수 있으며, 원래 역할 복원만으로 이 초기화를 되돌릴 수 없습니다.",14,TEXT),0);
+        RadioGroup choices=new RadioGroup(this);
+        RadioButton pd=new RadioButton(this);pd.setId(R.id.native_role_pd);pd.setText("발신 기기 (pd)");pd.setTextColor(TEXT);
+        RadioButton sd=new RadioButton(this);sd.setId(R.id.native_role_sd);sd.setText("수신 기기 (sd)");sd.setTextColor(TEXT);
+        choices.addView(pd);choices.addView(sd);choices.check("pd".equals(current.role)?R.id.native_role_pd:R.id.native_role_sd);
+        add(content,choices,12);
+        nativeApplyDialog=new AlertDialog.Builder(this).setTitle("가이드 방식으로 적용")
+                .setView(content).setNegativeButton("취소",null)
+                .setPositiveButton("초기화 후 역할 적용",(dialog,which) -> {
+                    if (!operationBusy && current!=null && !current.nativeResetPending && controller.shizukuReady())
+                        controller.applyViaDeveloper(choices.getCheckedRadioButtonId()==R.id.native_role_pd?"pd":"sd");
+                }).create();
+        nativeApplyDialog.setOnDismissListener(ignored -> nativeApplyDialog=null);
+        nativeApplyDialog.show();
+        nativeApplyDialog.getButton(AlertDialog.BUTTON_POSITIVE).setId(R.id.native_apply_confirm);
+        Runnable updateLabel=() -> {
+            if (nativeApplyDialog!=null) nativeApplyDialog.getButton(AlertDialog.BUTTON_POSITIVE).setText("초기화 후 "+RoleStore.roleName(choices.getCheckedRadioButtonId()==R.id.native_role_pd?"pd":"sd")+" 적용");
+        };
+        choices.setOnCheckedChangeListener((group,id) -> updateLabel.run());updateLabel.run();
+        nativeApplyDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setId(R.id.native_apply_cancel);
+    }
+
+    private void confirmAcceptNative() {
+        if (operationBusy || current==null || (!current.nativeResetPending && !current.externalChange)) return;
+        if (nativePendingDialog!=null && nativePendingDialog.isShowing()) return;
+        final boolean waiting=current.nativeResetPending;final String reviewedRole=current.role;
+        String body=waiting
+                ? "현재 역할: "+RoleStore.roleName(reviewedRole)+"\n요청 역할: "+RoleStore.roleName(current.transactionTarget)
+                    +"\n\n기기 설정을 쓰지 않고 현재 역할을 앱의 기준으로 채택합니다. 초기화·재부팅 요청은 다시 보내지 않습니다. CMC 등록·설정의 복구는 삼성 CMC에서 직접 진행해야 합니다. 재부팅 전에는 처리 중인 요청을 보호하기 위해 2분 동안 기록 정리를 제한합니다."
+                : "현재 역할: "+RoleStore.roleName(reviewedRole)+"\n저장된 원래 역할: "+RoleStore.roleName(current.originalRole)
+                    +"\n\n다른 곳에서 바꾼 현재 역할을 앱의 관리 기준으로 확인합니다. 기기 설정을 쓰거나 CMC를 초기화하지 않으며, 저장된 원래 역할도 유지합니다.";
+        nativePendingDialog=new AlertDialog.Builder(this).setTitle(waiting?"현재 상태로 대기 기록을 정리할까요?":"현재 역할로 기록 기준을 맞출까요?")
+                .setMessage(body).setNegativeButton("취소",null).setPositiveButton("현재 상태 확인",(dialog,which) -> {
+                    if (!operationBusy && current!=null && current.nativeResetPending==waiting
+                            && java.util.Objects.equals(current.role,reviewedRole)) {
+                        if (waiting) controller.acceptNativeState();else controller.adoptCurrentRole(reviewedRole);
+                    }
+                }).create();
+        nativePendingDialog.setOnDismissListener(ignored -> nativePendingDialog=null);nativePendingDialog.show();
+        nativePendingDialog.getButton(AlertDialog.BUTTON_POSITIVE).setId(R.id.native_pending_confirm);
+        nativePendingDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setId(R.id.native_pending_cancel);
     }
 
     private void showRoleConnectionHelp() {
@@ -429,7 +504,7 @@ public final class MainActivity extends Activity implements CmcApplication.Liste
 
     private boolean canOpenDeveloper() {
         return !operationBusy && controller.shizukuReady() && controller.preparationSupported()
-                && current != null && current.cmcInstalled && current.cmcEnabled;
+                && current != null && current.cmcInstalled && current.cmcEnabled && !current.nativeResetPending;
     }
 
     private boolean needsCmcSetup() {

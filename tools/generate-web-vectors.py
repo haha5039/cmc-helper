@@ -3,7 +3,7 @@
 from pathlib import Path
 import hashlib,json,os,subprocess,tempfile
 ROOT=Path(__file__).resolve().parents[1]
-JDK=Path(os.environ.get('JAVA_HOME') or os.environ["JAVA_HOME"])
+JDK=Path(os.environ['JAVA_HOME']).expanduser()
 native=ROOT/'app-preparation/com/haha5039/cmc/CmcOtp.java'
 source='''import com.haha5039.cmc.CmcOtp;
 import java.time.Instant;

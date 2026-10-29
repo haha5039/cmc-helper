@@ -39,6 +39,10 @@ public final class CmcUserService extends ICmcService.Stub {
     @Override public synchronized String openDeveloper(String requestId) {
         return runPreparation("developer", requestId);
     }
+    @Override public synchronized String applyNativeRole(String role,String requestId) {
+        if (!"pd".equals(role) && !"sd".equals(role)) throw new IllegalArgumentException("Role required");
+        return runPreparation("native_"+role,requestId);
+    }
     @Override public synchronized String refreshCmcUi() {
         requireShell();
         try {

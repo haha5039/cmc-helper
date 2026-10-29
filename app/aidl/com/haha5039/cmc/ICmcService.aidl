@@ -9,4 +9,5 @@ interface ICmcService {
     String prepareRole(String role, String requestId) = 5;
     String openDeveloper(String requestId) = 6;
     String refreshCmcUi() = 7;
+    String applyNativeRole(String role, String requestId) = 8;
 }

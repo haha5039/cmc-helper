@@ -14,7 +14,8 @@ final class CommandSpec {
     }
     static String[] preparation(String operation, String request) {
         if (!"prepare".equals(operation) && !"disable".equals(operation)
-                && !"role_sd".equals(operation) && !"role_pd".equals(operation) && !"developer".equals(operation))
+                && !"role_sd".equals(operation) && !"role_pd".equals(operation) && !"developer".equals(operation)
+                && !"native_sd".equals(operation) && !"native_pd".equals(operation))
             throw new IllegalArgumentException("Unsupported preparation");
         if (request == null || !request.matches("[a-f0-9]{32}"))
             throw new IllegalArgumentException("Invalid request identifier");
@@ -46,10 +47,25 @@ final class CommandSpec {
         String prefix = "prepare".equals(operation) ? "PREPARED:"
                 : "disable".equals(operation) ? "EXCEPTION_DISABLED:"
                 : "developer".equals(operation) ? "DEVELOPER_OPENED:"
+                : operation.startsWith("native_") ? "NATIVE_APPLY_REQUESTED:" + operation.substring(7)
                 : "ROLE_READY:" + operation.substring(5);
-        return output.contains("INSTRUMENTATION_RESULT: request_id=" + request + "\n")
-                && output.contains("INSTRUMENTATION_RESULT: result="
-                        + prefix)
+        return envelope(output,request) && hasResult(output,prefix);
+    }
+    static boolean nativeNotApplied(String output,String role,String request) {
+        preparation("native_"+role,request);
+        return output!=null && !output.contains("BRIDGE_FAILED:") && envelope(output,request)
+                && hasResult(output,"NATIVE_NOT_APPLIED:"+role)
+                && !output.contains("NATIVE_APPLY_REQUESTED:") && !output.contains("NATIVE_APPLY_UNCERTAIN:");
+    }
+    private static boolean hasResult(String output,String prefix) {
+        for (String line : output.split("\n")) {
+            String exact="INSTRUMENTATION_RESULT: result="+prefix;
+            if (line.equals(exact) || line.startsWith(exact+" ")) return true;
+        }
+        return false;
+    }
+    private static boolean envelope(String output,String request) {
+        return output.contains("INSTRUMENTATION_RESULT: request_id="+request+"\n")
                 && output.contains("INSTRUMENTATION_RESULT: game_permission_after=-1\n")
                 && output.contains("INSTRUMENTATION_CODE: -1\n");
     }

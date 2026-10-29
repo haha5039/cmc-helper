@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Finite self-instrumentation started by Shizuku or ADB. Never invokes ResetService. */
+/** Finite fixed-target preparation. Native reset requires an active, confirmed app request. */
 public final class PrepareInstrumentation extends Instrumentation {
     private static final String CMC = "com.samsung.android.mdecservice";
     private static final String PREFIX = CMC + ":id/";
@@ -34,6 +34,10 @@ public final class PrepareInstrumentation extends Instrumentation {
         deadline = SystemClock.uptimeMillis() + 45000;
         out.putString("request_id", arguments == null ? "" : arguments.getString("request_id", ""));
         out.putInt("actual_uid", Process.myUid());
+        String operation = arguments == null ? "prepare" : arguments.getString("operation", "prepare");
+        boolean nativeApply = "native_sd".equals(operation) || "native_pd".equals(operation);
+        String nativeRole = nativeApply ? operation.substring(7) : "";
+        boolean nativeAttempted = false;
         try {
             Context context = getTargetContext();
             if (Process.myUid() < 10000) throw new SecurityException("일반 앱 UID에서만 실행합니다.");
@@ -45,11 +49,15 @@ public final class PrepareInstrumentation extends Instrumentation {
                 throw new IllegalStateException("이 준비 절차는 CMC 9.1.00.15에서만 검증됐습니다.");
             automation = getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES);
             if (automation == null) throw new IllegalStateException("ADB am instrument로 실행하세요.");
-            String operation = arguments == null ? "prepare" : arguments.getString("operation", "prepare");
             boolean switching = "role_sd".equals(operation) || "role_pd".equals(operation);
             boolean developerShortcut = "developer".equals(operation);
-            if (!"prepare".equals(operation) && !"disable".equals(operation) && !switching && !developerShortcut)
+            if (!"prepare".equals(operation) && !"disable".equals(operation) && !switching && !developerShortcut && !nativeApply)
                 throw new IllegalArgumentException("지원하지 않는 작업");
+            if (nativeApply) {
+                if (arguments==null || !"shizuku".equals(arguments.getString("bridge", ""))
+                        || !((CmcApplication)context.getApplicationContext()).nativeApplyAuthorized(arguments.getString("request_id", ""),nativeRole))
+                    throw new SecurityException("앱에서 확인한 초기화 적용 요청이 아닙니다.");
+            }
             if ("disable".equals(operation)) {
                 for (String key : new String[]{"cmc_activation", "cmc_call_activation", "cmc_message_activation"})
                     if (!"0".equals(Settings.Global.getString(context.getContentResolver(), key)))
@@ -73,7 +81,7 @@ public final class PrepareInstrumentation extends Instrumentation {
                     return;
                 }
             }
-            if (("prepare".equals(operation) || developerShortcut)
+            if (("prepare".equals(operation) || developerShortcut || nativeApply)
                     && !"1".equals(Settings.Global.getString(context.getContentResolver(), "cmc_oobe")))
                 throw new IllegalStateException("삼성 CMC의 초기 설정을 먼저 완료하세요. 초기 설정 전에는 정보 화면이 자동 종료됩니다.");
             boolean phone = arguments != null && "shizuku".equals(arguments.getString("bridge", ""));
@@ -140,6 +148,20 @@ public final class PrepareInstrumentation extends Instrumentation {
             SystemClock.sleep(500);
             toggle = checkable(waitId(PREFIX + "dev_switch_bar", 2000));
             if (toggle == null || !toggle.isChecked()) throw new IllegalStateException("테스트 스위치 켜짐을 확인하지 못했습니다.");
+            if (nativeApply) {
+                if (!"PRD".equals(preferenceSummary("CMC Server(developer only)")))
+                    throw new IllegalStateException("개발자 서버가 PRD인지 확인하세요. 서버 값을 자동 변경하지 않습니다.");
+                selectNativeRole(nativeRole);
+                if (!"1".equals(Settings.Global.getString(context.getContentResolver(),"cmc_oobe")))
+                    throw new IllegalStateException("CMC 초기 설정 상태가 바뀌어 중단했습니다.");
+                AccessibilityNodeInfo apply=waitId(PREFIX+"save_restart_btn",3000);
+                if (!((CmcApplication)context.getApplicationContext()).claimNativeApply(arguments.getString("request_id", ""),nativeRole))
+                    throw new SecurityException("초기화 요청 또는 기기 상태가 바뀌어 중단했습니다.");
+                nativeAttempted=true; // An uncertain click must never be retried automatically.
+                click(apply);
+                out.putString("result","NATIVE_APPLY_REQUESTED:"+nativeRole+" 삼성 CMC에 초기화 적용을 요청했습니다. 재부팅 후 결과를 확인하세요.");
+                return;
+            }
             if (switching) {
                 // AboutPageActivity exits when cmc_oobe is off. Prepare the flag
                 // before the native service-off flow can clear that value.
@@ -158,12 +180,13 @@ public final class PrepareInstrumentation extends Instrumentation {
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
         } catch (Throwable error) {
             Throwable cause = error.getCause() == null ? error : error.getCause();
-            String failure = "PREPARATION_FAILED: " + cause.getClass().getSimpleName() + ": " + cause.getMessage();
+            String failure = (nativeApply ? (nativeAttempted ? "NATIVE_APPLY_UNCERTAIN:" : "NATIVE_NOT_APPLIED:")+nativeRole+" "
+                    : "PREPARATION_FAILED: ") + cause.getClass().getSimpleName() + ": " + cause.getMessage();
             getTargetContext().getSharedPreferences("cmc_helper", 0).edit()
                     .putString("preparation_result", failure).commit();
             out.putString("result", failure);
             try {
-                getTargetContext().startActivity(new Intent(getTargetContext(), MainActivity.class)
+                if (!nativeAttempted) getTargetContext().startActivity(new Intent(getTargetContext(), MainActivity.class)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
             } catch (RuntimeException ignored) { }
         } finally {
@@ -172,6 +195,56 @@ public final class PrepareInstrumentation extends Instrumentation {
             out.putInt("uid_after", Process.myUid());
             finish(Activity.RESULT_OK, out);
         }
+    }
+
+    private String preferenceSummary(String titleText) {
+        AccessibilityNodeInfo title=findText(root(),titleText);
+        if (title==null) throw new IllegalStateException("개발자 옵션을 찾지 못했습니다: "+titleText);
+        AccessibilityNodeInfo parent=title.getParent();
+        for (int depth=0;parent!=null && depth<3;depth++,parent=parent.getParent()) {
+            List<AccessibilityNodeInfo> summaries=new ArrayList<>();collect(parent,"android:id/summary",summaries);
+            if (summaries.size()==1 && summaries.get(0).getText()!=null) return summaries.get(0).getText().toString();
+            if (summaries.size()>1) break;
+        }
+        throw new IllegalStateException("개발자 옵션 선택값을 확인하지 못했습니다.");
+    }
+    private void selectNativeRole(String role) {
+        AccessibilityNodeInfo title=findText(root(),"Device Type");
+        if (title==null) throw new IllegalStateException("Device Type을 찾지 못했습니다.");
+        AccessibilityNodeInfo control=title;
+        for (int i=0;control!=null && !control.isClickable() && i<5;i++) control=control.getParent();
+        if (control==null || !control.isClickable()) throw new IllegalStateException("역할 선택을 열 수 없습니다.");
+        click(control);
+        long until=Math.min(deadline,SystemClock.uptimeMillis()+4000);
+        AccessibilityNodeInfo target=null;
+        do {
+            List<AccessibilityNodeInfo> options=new ArrayList<>();collect(root(),"android:id/text1",options);
+            boolean pd=false,sd=false;
+            for (AccessibilityNodeInfo option:options) {
+                String text=String.valueOf(option.getText());
+                if ("pd".equals(text)) pd=true;
+                if ("sd".equals(text)) sd=true;
+                if (role.equals(text)) target=option;
+            }
+            if (options.size()==2 && pd && sd && target!=null) break;
+            target=null;SystemClock.sleep(100);
+        } while (SystemClock.uptimeMillis()<until);
+        if (target==null) throw new IllegalStateException("지원하는 역할 선택 화면이 아닙니다.");
+        click(target);
+        until=Math.min(deadline,SystemClock.uptimeMillis()+3000);
+        do {
+            try { if (role.equals(preferenceSummary("Device Type"))) return; } catch (IllegalStateException loading) { }
+            SystemClock.sleep(100);
+        } while (SystemClock.uptimeMillis()<until);
+        throw new IllegalStateException("선택한 역할 표시를 확인하지 못했습니다.");
+    }
+    private static AccessibilityNodeInfo findText(AccessibilityNodeInfo node,String text) {
+        if (node==null) return null;
+        if (text.equals(String.valueOf(node.getText()))) return node;
+        for (int i=0;i<node.getChildCount();i++) {
+            AccessibilityNodeInfo found=findText(node.getChild(i),text);if (found!=null) return found;
+        }
+        return null;
     }
 
     private boolean allOff(Context context) {

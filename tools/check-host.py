@@ -3,7 +3,13 @@
 from pathlib import Path
 import hashlib,json,os,subprocess,tempfile
 ROOT=Path(__file__).resolve().parents[1]
-JDK=Path(os.environ.get('JAVA_HOME') or os.environ["JAVA_HOME"])
+JDK=Path(os.environ['JAVA_HOME']).expanduser()
+def checked(command,**options):
+    result=subprocess.run(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,**options)
+    output=result.stdout.replace(str(ROOT),"<project>").replace(str(JDK),"<jdk>").replace(str(Path.home()),"<home>")
+    if output.strip(): print(output.strip())
+    if result.returncode: raise SystemExit("Host command failed (exit "+str(result.returncode)+")")
+
 cache=ROOT/'.deps'
 cache.mkdir(exist_ok=True)
 dependencies=[]
@@ -20,11 +26,11 @@ with tempfile.TemporaryDirectory(prefix='cmc-checks-') as directory:
     sources += sorted((ROOT/'tests').glob('*.java'))
     sources += sorted((ROOT/'tests/host').rglob('*.java'))
     classpath=os.pathsep.join(map(str,dependencies))
-    subprocess.run([str(JDK/'bin/javac'),'--release','8','-encoding','UTF-8','-cp',classpath,'-d',directory,*map(str,sources)],check=True)
+    checked([str(JDK/'bin/javac'),'--release','8','-encoding','UTF-8','-cp',classpath,'-d',directory,*map(str,sources)])
     fixture=Path(directory)/'settings-state'
     fixture.mkdir()
     environment=os.environ.copy()
     environment['PATH']=str(ROOT/'tests/fixtures')+os.pathsep+environment.get('PATH','')
     environment['CMC_TEST_SETTINGS_DIR']=str(fixture)
-    for name in ['OtpChecks','BridgeChecks','CalculatorChecks','StoreChecks','SessionChecks','EngineChecks']:
-        subprocess.run([str(JDK/'bin/java'),'-cp',directory+os.pathsep+classpath,'com.haha5039.cmc.'+name],check=True,timeout=45,env=environment)
+    for name in ['OtpChecks','BridgeChecks','CalculatorChecks','StoreChecks','SessionChecks','EngineChecks','NativeApplyChecks']:
+        checked([str(JDK/'bin/java'),'-cp',directory+os.pathsep+classpath,'com.haha5039.cmc.'+name],timeout=45,env=environment)

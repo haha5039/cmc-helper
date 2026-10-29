@@ -32,7 +32,7 @@ final class ShizukuSession implements RoleStore.Writer {
         this.observer = observer;
         args = new Shizuku.UserServiceArgs(new ComponentName(context, CmcUserService.class))
                 .tag("cmc-phone-controls").processNameSuffix("cmc_engine")
-                .daemon(false).debuggable(false).version(6);
+                .daemon(false).debuggable(false).version(7);
     }
     void start() {
         Shizuku.addBinderReceivedListenerSticky(() -> main.post(() -> { problem = ""; refresh(); }));
@@ -206,6 +206,24 @@ final class ShizukuSession implements RoleStore.Writer {
                 throw new IOException("개발자 화면 열기를 완료하지 못했습니다.\n" + (result == null ? "Shizuku 응답 없음" : result));
             return "삼성 CMC 개발자 화면을 열었습니다. 화면에서 필요한 항목을 직접 확인하세요.";
         } catch (android.os.RemoteException error) { throw new IOException("개발자 화면 실행 중 Shizuku 연결이 끊겼습니다.", error); }
+    }
+    boolean nativeApplyApproved() {
+        try { return available() && Shizuku.pingBinder()
+                && Shizuku.checkSelfPermission()==PackageManager.PERMISSION_GRANTED; }
+        catch (RuntimeException denied) { return false; }
+    }
+    boolean applyNativeRole(String role,String request) throws IOException {
+        if (!"pd".equals(role) && !"sd".equals(role)) throw new IOException("지원하지 않는 역할");
+        ICmcService target;
+        try { target=requireService(); } catch (IOException notStarted) { return false; }
+        try {
+            String result=target.applyNativeRole(role,request);
+            if (CommandSpec.completed(result,"native_"+role,request)) return true;
+            if (CommandSpec.nativeNotApplied(result,role,request)) return false;
+            throw new IOException("초기화 적용 결과를 확인하지 못했습니다. 다시 실행하지 말고 재부팅 후 상태를 확인하세요.");
+        } catch (android.os.RemoteException error) {
+            throw new IOException("초기화 요청 중 연결이 끊겼습니다. 요청을 재실행하지 말고 재부팅 후 상태를 확인하세요.",error);
+        }
     }
     String refreshCmcUi() {
         try {

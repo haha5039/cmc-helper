@@ -12,6 +12,7 @@ public interface ICmcService {
     String prepareRole(String role,String request) throws RemoteException;
     String openDeveloper(String request) throws RemoteException;
     String refreshCmcUi() throws RemoteException;
+    String applyNativeRole(String role,String request) throws RemoteException;
     abstract class Stub implements ICmcService {
         public IBinder asBinder() { return null; }
         public static ICmcService asInterface(IBinder binder) { return (ICmcService) binder; }

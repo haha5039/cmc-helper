@@ -8,6 +8,10 @@ import android.provider.Settings;
 import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.*;
+import android.webkit.WebView;
+import org.json.JSONObject;
+import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -45,6 +49,8 @@ public final class UiChecks extends Instrumentation {
             check(ui(() -> find("status_cmc").getContentDescription()==null),"status speaks its current value");
             check(ui(() -> text("status_guidance").contains("KEY 계산기")),"missing CMC guidance");
             check(ui(() -> !find("open_native_cmc").isEnabled()),"missing CMC settings disabled");
+            check(ui(() -> !find("native_apply_open").isEnabled()),"native reset disabled without supported CMC/engine");
+            checkNativePendingRecovery();
             screenshot("home.png");
             tap("role_sd");
             waitNode(PACKAGE+":id/cmc_unavailable");
@@ -74,6 +80,24 @@ public final class UiChecks extends Instrumentation {
             assertCurrentCode();
             check(ui(() -> text("calculator_basis").startsWith("KEY 1abcd")),"input normalization");
             check(ui(() -> find("calculator_code").getContentDescription().toString().equals("인증코드 "+text("calculator_code").replace(""," ").trim())),"code speaks individual digits");
+            ui(() -> { ((EditText)find("calculator_key")).setSelection(3);return null; });
+            tap("open_manual_guide");waitActivity("ManualGuideActivity",null);
+            check(ui(() -> find("manual_guide_web") instanceof WebView),"offline guide screen");
+            check(ui(() -> {
+                WebView view=(WebView)find("manual_guide_web");
+                return !view.getSettings().getJavaScriptEnabled() && !view.getSettings().getAllowFileAccess()
+                        && !view.getSettings().getAllowContentAccess() && view.getSettings().getBlockNetworkLoads()
+                        && !view.getSettings().getDomStorageEnabled();
+            }),"guide disables scripts/file/content/network/storage");
+            waitUntil(() -> {
+                AccessibilityNodeInfo root=getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES).getRootInActiveWindow();
+                return visibleText(root).contains("Apply and Reset을 반드시");
+            },10000);
+            check(true,"procedural guide content rendered");screenshot("manual-guide.png");
+            tap("manual_guide_back");waitActivity("OtpCalculatorActivity",null);
+            check(ui(() -> text("calculator_key").equals(" 1ABCD ")),"calculator input preserved through guide");
+            check(ui(() -> ((EditText)find("calculator_key")).getSelectionStart())==3,"calculator cursor preserved through guide");
+            assertCurrentCode();
             screenshot("calculator.png");
             ui(() -> { ((ScrollView)find("calculator_scroll")).fullScroll(View.FOCUS_DOWN); return null; });
             screenshot("calculator-result.png");
@@ -114,6 +138,58 @@ public final class UiChecks extends Instrumentation {
             finish(Activity.RESULT_OK,result);
         }
     }
+    private void checkNativePendingRecovery() throws Exception {
+        Map<String,String> before=cmcState();String role=before.get("cmc_device_type");
+        if (role!=null && !"pd".equals(role) && !"sd".equals(role)) throw new AssertionError("Unexpected emulator role fixture");
+        java.io.File journal=new java.io.File(getTargetContext().getNoBackupFilesDir(),"cmc-role-journal.json");
+        byte[] saved=journal.exists()?Files.readAllBytes(journal.toPath()):null;
+        long boot=Long.parseLong(Settings.Global.getString(getTargetContext().getContentResolver(),"boot_count"));
+        if (boot<1) throw new AssertionError("Emulator boot counter not ready");
+        try {
+            fixtureRole("sd");writeNativeFixture(journal,boot-1);
+            tap("refresh_status");
+            waitUntil(() -> ui(() -> text("operation_result").contains("재부팅 후") && text("status_role").equals("수신 기기")),7000);
+            JSONObject recovered=new JSONObject(new String(Files.readAllBytes(journal.toPath()),StandardCharsets.UTF_8));
+            check(!recovered.getBoolean("pending") && recovered.getString("owned").equals("sd"),"post-boot role reconciles without native replay");
+            check(getTargetContext().checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS")==-1,"post-boot reconciliation needs no settings permission");
+            fixtureRole("pd");writeNativeFixture(journal,boot);
+            tap("refresh_status");
+            waitUntil(() -> ui(() -> find("native_pending_resolve").getVisibility()==View.VISIBLE && !find("role_sd").isEnabled()),4000);
+            check(ui(() -> !find("role_pd").isEnabled() && !find("restore_original").isEnabled()),"pending reset blocks ordinary mutations");
+            JSONObject pending=new JSONObject(new String(Files.readAllBytes(journal.toPath()),StandardCharsets.UTF_8));
+            pending.put("startedAt",System.currentTimeMillis()-121000);Files.write(journal.toPath(),pending.toString().getBytes(StandardCharsets.UTF_8));
+            tap("native_pending_resolve");clickNode(PACKAGE+":id/native_pending_confirm");
+            waitUntil(() -> ui(() -> find("native_pending_resolve").getVisibility()==View.GONE),4000);
+            check("pd".equals(Settings.Global.getString(getTargetContext().getContentResolver(),"cmc_device_type")),"resolving record does not write role");
+        } finally {
+            if (saved==null) Files.deleteIfExists(journal.toPath());else Files.write(journal.toPath(),saved);
+            fixtureRole(role);tap("refresh_status");
+            String expected="pd".equals(role)?"발신 기기":"sd".equals(role)?"수신 기기":"미설정";
+            waitUntil(() -> ui(() -> text("status_role").equals(expected) && find("role_sd").isEnabled()),4000);
+        }
+    }
+    private static void writeNativeFixture(java.io.File file,long boot) throws Exception {
+        JSONObject j=new JSONObject();
+        j.put("version",1).put("hasOriginal",true).put("original","pd").put("hasOwned",false).put("owned",JSONObject.NULL)
+                .put("pending",true).put("before","pd").put("target","sd").put("kind","native-reset")
+                .put("startedAt",System.currentTimeMillis()).put("lastResult","fixture")
+                .put("nativeRequest","0123456789abcdef0123456789abcdef").put("nativeBootCount",boot);
+        Files.write(file.toPath(),j.toString().getBytes(StandardCharsets.UTF_8));
+    }
+    private void fixtureRole(String role) throws Exception {
+        if (role!=null && !"pd".equals(role) && !"sd".equals(role)) throw new IllegalArgumentException();
+        String command=role==null?"settings delete global cmc_device_type":"settings put global cmc_device_type "+role;
+        try (java.io.InputStream input=new ParcelFileDescriptor.AutoCloseInputStream(getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES).executeShellCommand(command))) {
+            byte[] buffer=new byte[1024];while (input.read(buffer)!=-1) { }
+        }
+    }
+    private static String visibleText(AccessibilityNodeInfo node) {
+        if (node==null) return "";StringBuilder value=new StringBuilder();
+        if (node.getText()!=null) value.append(node.getText()).append(' ');
+        for(int i=0;i<node.getChildCount();i++) value.append(visibleText(node.getChild(i)));
+        return value.toString();
+    }
+
     private Map<String,String> cmcState() {
         Map<String,String> state=new LinkedHashMap<>();
         for (String key : new String[]{"cmc_device_type","cmc_oobe","cmc_activation","cmc_call_activation","cmc_message_activation"})
@@ -150,7 +226,10 @@ public final class UiChecks extends Instrumentation {
         if (view==null) throw new AssertionError("Missing view "+name); return view;
     }
     private String text(String name) { return ((TextView)find(name)).getText().toString(); }
-    private void tap(String name) { check(ui(() -> find(name).performClick()),"click "+name); waitForIdleSync(); }
+    private void tap(String name) {
+        waitUntil(() -> ui(() -> { View target=find(name);return target.isEnabled() && target.performClick(); }),4000);
+        check(true,"click "+name);waitForIdleSync();
+    }
     private AccessibilityNodeInfo waitNode(String id) {
         AtomicReference<AccessibilityNodeInfo> node=new AtomicReference<>();
         waitUntil(() -> {

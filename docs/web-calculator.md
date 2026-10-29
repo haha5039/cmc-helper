@@ -4,7 +4,7 @@
 
 5자리 KEY의 대문자·공백 정리, UTC 기준 계산, 분 경계 자동 갱신, 복사 직전 재계산, KEY 변경 시 이전 결과 무효화, 입력 지우기와 KEY 안내를 제공합니다. 화면이 숨겨지면 타이머를 멈추고 돌아오면 현재 코드로 갱신합니다. 복사를 지원하지 않거나 거부하는 브라우저에서는 코드를 선택해 수동 복사를 안내합니다.
 
-하단 가이드는 CMC 9.1.00.15의 인증된 개발자 화면 경로만 안내합니다. KEY 인증 → 테스트 사용 ON → Device Type 선택 → Apply and Reset → 재설정·기기 연결 순서입니다. 드롭다운 선택만으로 실제 역할이 바뀌지 않는 점과 미인증 Apply/Reset이 기본 역할로 초기화될 수 있는 점을 설명합니다. ADB 전환·복원 명령은 사용자 가이드에서 제거했습니다.
+하단 가이드는 CMC 9.1.00.15의 인증된 개발자 화면 경로를 안내합니다. KEY 인증 → 테스트 사용 ON → Device Type 선택 → Apply and Reset → 재설정·기기 연결 순서입니다. 드롭다운 선택과 실제 역할 적용을 구분하고, 초기화·재부팅 및 연결 재설정 절차를 설명합니다.
 
 ## 검사와 로컬 실행
 
@@ -20,5 +20,3 @@ http://localhost:8767/ 에서 사용합니다. ES module이므로 index.html 파
 `.github/workflows/pages.yml`은 main의 웹 파일이 바뀌거나 수동 실행할 때 계산 검사를 먼저 수행합니다. 저장소에서 Pages가 활성화되어 있으면 **site 폴더만** 배포합니다. 앱 소스·APK·기기 기록·서명 자료는 Pages 산출물에 포함하지 않습니다. Pages 미설정(HTTP 404)은 명시적 notice 후 배포만 건너뛰며, 다른 API 오류는 실패 처리합니다.
 
 Pages 사용이 가능한 저장소/요금제에서 Settings → Pages → Source를 GitHub Actions로 설정하고 workflow를 실행합니다. 기본 프로젝트 주소는 https://haha5039.github.io/cmc-helper/ 입니다. 배포 상태는 저장소의 GitHub Actions에서 확인할 수 있습니다.
-
-2026-10-28 확인: 저장소 공개 상태에서 GitHub Pages를 활성화했습니다. GitHub Actions를 통한 배포 주소는 https://haha5039.github.io/cmc-helper/ 입니다.

@@ -6,3 +6,29 @@ __pycache__/
 build/
 
 .deps/
+
+# Local diagnostics, signing and generated evidence must never be published.
+/evidence/
+/reports/
+/screenshots/
+/captures/
+/outputs/
+/private/
+/docs/*verification*
+/docs/*.png
+*.keystore
+*.jks
+*.p12
+*.pem
+.env
+.env.*
+
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.log
+*.hprof
+*.dmp
+logcat.txt
+instrumentation.txt

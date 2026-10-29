@@ -16,6 +16,8 @@ def main():
     def command(*parts,check=True,timeout=20):
         return subprocess.run([*adb,*map(str,parts)],check=check,capture_output=True,text=True,timeout=timeout)
     if command('shell','getprop','ro.kernel.qemu').stdout.strip()!='1': raise RuntimeError('Not an Android emulator')
+    if command('shell','getprop','sys.boot_completed').stdout.strip()!='1': raise RuntimeError('Emulator not booted')
+    if 'Application Not Responding:' in command('shell','dumpsys','window','windows').stdout: raise RuntimeError('Resolve the emulator ANR before testing')
     for package in ['com.samsung.android.mdecservice','moe.shizuku.privileged.api']:
         if command('shell','pm','path',package,check=False).stdout.strip():
             raise RuntimeError('Use a clean emulator without Samsung CMC or Shizuku')
@@ -39,6 +41,8 @@ def main():
     blocks=logs.split('FATAL EXCEPTION:')
     for block in blocks[1:]:
         if 'com.haha5039.cmc' in block[:1200]: relevant.append('app_fatal_exception')
+    if re.search(r'ANR in (?:com\.haha5039\.cmc|com\.android\.systemui)',logs): relevant.append('app_or_system_ui_anr')
+    if 'Application Not Responding:' in command('shell','dumpsys','window','windows').stdout: relevant.append('active_anr_window')
     if 'WindowLeaked' in logs and 'com.haha5039.cmc' in logs: relevant.append('window_leak_requires_review')
     passed='INSTRUMENTATION_RESULT: result=PASS' in output and result.returncode==0 and not relevant
     data={'result':'pass' if passed else 'fail','serial':args.serial,

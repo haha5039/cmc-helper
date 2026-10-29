@@ -18,6 +18,8 @@ public final class CmcApplication extends Application {
     private boolean busy, error;
     private String message = "";
     private volatile int helperTask = -1;
+    private volatile String nativeResetNonce,nativeResetRole,nativeResetBeforeRole;
+    private boolean nativeResetPressClaimed;
 
     @Override public void onCreate() {
         super.onCreate();
@@ -36,6 +38,9 @@ public final class CmcApplication extends Application {
     void apply(String role) { execute("apply", role); }
     void applyConfirmed(String role) { execute("apply-confirmed", role); }
     void restore() { execute("restore", null); }
+    void applyViaDeveloper(String role) { execute("native-apply",role); }
+    void acceptNativeState() { execute("accept-native",null); }
+    void adoptCurrentRole(String role) { execute("adopt-current",role); }
     void connectShizuku() { if (!busy) shizuku.authorize(); }
     String connectionStatus() { return shizuku.label(); }
     boolean shizukuReady() { return shizuku.available(); }
@@ -52,6 +57,16 @@ public final class CmcApplication extends Application {
         return shizuku.launchNative(request, developer, task);
     }
     int preparationTaskId() { return helperTask; }
+    synchronized boolean nativeApplyAuthorized(String request,String role) {
+        return request!=null && request.equals(nativeResetNonce) && role.equals(nativeResetRole)
+                && !nativeResetPressClaimed && shizuku.nativeApplyApproved()
+                && java.util.Objects.equals(nativeResetBeforeRole,
+                        android.provider.Settings.Global.getString(getContentResolver(),RoleStore.ROLE_KEY));
+    }
+    synchronized boolean claimNativeApply(String request,String role) {
+        if (!nativeApplyAuthorized(request,role)) return false;
+        nativeResetPressClaimed=true;return true;
+    }
 
     private void execute(String operation, String role) {
         if (busy || (!"refresh".equals(operation) && shizuku.busy())) return;
@@ -69,7 +84,31 @@ public final class CmcApplication extends Application {
             String advisory = "";
             boolean failed = error;
             try {
-                if ("developer".equals(operation)) {
+                if ("native-apply".equals(operation)) {
+                    if (!preparationSupported() || !shizuku.available())
+                        throw new java.io.IOException("지원 CMC 버전과 Shizuku 연결을 확인하세요.");
+                    String request=java.util.UUID.randomUUID().toString().replace("-", "");
+                    RoleStore.Snapshot before=store.stageNativeReset(role,request);
+                    synchronized (this) {
+                        nativeResetNonce=request;nativeResetRole=role;nativeResetBeforeRole=before.role;nativeResetPressClaimed=false;
+                    }
+                    try {
+                        boolean accepted=shizuku.applyNativeRole(role,request);
+                        if (!accepted) {
+                            store.cancelNativeResetBeforeClick(request);
+                            throw new java.io.IOException("적용 버튼을 누르기 전에 중단했습니다. CMC 화면과 초기 설정 상태를 확인하세요.");
+                        }
+                        result="삼성 CMC에 초기화 적용을 요청했습니다. 재부팅과 초기 설정 후 이 앱을 다시 열어 결과를 확인하세요.";
+                        next=store.snapshot();failed=false;
+                    } finally {
+                        synchronized (this) { nativeResetNonce=null;nativeResetRole=null;nativeResetBeforeRole=null; }
+                    }
+                } else if ("adopt-current".equals(operation)) {
+                    next=store.adoptExternalRole(role);
+                } else if ("accept-native".equals(operation)) {
+                    next=store.acceptNativeResetState();
+                } else if ("developer".equals(operation)) {
+                    if (store.snapshot().nativeResetPending) throw new java.io.IOException("초기화 요청 결과를 먼저 확인하세요.");
                     if (!preparationSupported()) throw new java.io.IOException("이 기기의 CMC에서는 개발자 바로가기를 지원하지 않습니다.");
                     result = shizuku.openDeveloper(java.util.UUID.randomUUID().toString().replace("-", ""));
                     next = store.snapshot();
@@ -102,8 +141,11 @@ public final class CmcApplication extends Application {
                     if (!java.util.Objects.equals(before.role, role) && shizuku.available()) advisory = shizuku.refreshCmcUi();
                 }
                 else if ("restore".equals(operation)) next = store.restore();
-                else next = store.snapshot();
-                if (!"refresh".equals(operation) && !"prepare".equals(operation) && !"disable".equals(operation) && !"developer".equals(operation)) {
+                else {
+                    next=store.reconcileNativeReset();
+                    if (next.nativeResetPending || "native-reset".equals(next.transactionKind)) { result=next.lastResult;failed=false; }
+                }
+                if (!"refresh".equals(operation) && !"prepare".equals(operation) && !"disable".equals(operation) && !"developer".equals(operation) && !"native-apply".equals(operation)) {
                     result = next.lastResult + advisory;
                     failed = false;
                 }

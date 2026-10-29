@@ -33,6 +33,6 @@ def main():
         args.output.parent.mkdir(parents=True,exist_ok=True)
         shutil.copyfile(signed,args.output)
         print('Test APK certificate verified: '+app.CERTIFICATE)
-        print('Separate test APK: '+str(args.output.resolve()))
+        print('Separate signed test APK written to the requested output.')
 
 if __name__=='__main__': main()

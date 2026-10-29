@@ -109,9 +109,15 @@ final class RoleStore {
     private static void checkApply(Journal journal, String before, String role) throws IOException {
         if (!"pd".equals(role) && !"sd".equals(role))
             throw new IllegalArgumentException("지원하는 역할은 pd와 sd입니다.");
-        if (Objects.equals(before, role)) return; // No-op remains safe even with a pending journal.
+        if (journal.pending && "native-reset".equals(journal.kind))
+            throw new IOException("초기화 적용 요청이 대기 중입니다. 재부팅 후 결과를 확인하세요.");
+        if (Objects.equals(before, role)) return; // No-op remains safe for ordinary interrupted writes.
+        checkChangeContext(journal,before);
+    }
+
+    private static void checkChangeContext(Journal journal,String before) throws IOException {
         if (journal.pending)
-            throw new IOException("중단된 작업 기록이 있습니다. 먼저 ‘원래 역할 복원’을 실행하세요.");
+            throw new IOException("중단된 작업 기록이 있습니다. 먼저 작업 결과를 확인하세요.");
         if (journal.hasOriginal && !Objects.equals(before, journal.original)
                 && (!journal.hasOwned || !Objects.equals(before, journal.owned))) throw conflict();
         if (!writableRole(before) || (journal.hasOriginal && !writableRole(journal.original)))
@@ -128,6 +134,8 @@ final class RoleStore {
             try (RandomAccessFile file = new RandomAccessFile(lockFile, "rw");
                  FileLock ignored = file.getChannel().lock()) {
                 Journal journal = load();
+                if (journal.pending && "native-reset".equals(journal.kind))
+                    throw new IOException("초기화 적용 결과를 먼저 확인하세요. 역할 복원으로 초기화를 취소할 수는 없습니다.");
                 if (!journal.hasOriginal)
                     throw new IOException("저장된 원래 역할이 없습니다. 아직 이 앱에서 역할을 바꾸지 않았습니다.");
                 String current = readRole();
@@ -155,6 +163,105 @@ final class RoleStore {
                 return snapshot(load(), null);
             }
         }
+    }
+
+    synchronized Snapshot adoptExternalRole(String expected) throws IOException {
+        requireWorker();
+        synchronized (PROCESS_LOCK) {
+            try (RandomAccessFile file=new RandomAccessFile(lockFile,"rw");FileLock ignored=file.getChannel().lock()) {
+                Journal journal=load();String current=readRole();requireUnchanged(expected);
+                if (journal.pending) throw new IOException("대기 중인 작업 결과를 먼저 확인하세요.");
+                if (!writableRole(current)) throw new IOException("현재 역할을 확인할 수 없습니다.");
+                boolean external=journal.hasOriginal && !Objects.equals(current,journal.original)
+                        && (!journal.hasOwned || !Objects.equals(current,journal.owned));
+                if (!external) return snapshot(journal,"현재 역할 기록을 변경할 필요가 없습니다.");
+                journal.hasOwned=true;journal.owned=current;
+                journal.lastResult="현재 역할을 앱의 관리 기준으로 확인했습니다. 저장된 원래 역할과 기기 설정은 변경하지 않았습니다.";
+                save(journal);return snapshot(journal,null);
+            }
+        }
+    }
+
+    synchronized Snapshot stageNativeReset(String role,String request) throws IOException {
+        requireWorker();
+        if (!("pd".equals(role)||"sd".equals(role)) || request==null || !request.matches("[a-f0-9]{32}"))
+            throw new IllegalArgumentException("잘못된 초기화 적용 요청");
+        synchronized (PROCESS_LOCK) {
+            try (RandomAccessFile file=new RandomAccessFile(lockFile,"rw");FileLock ignored=file.getChannel().lock()) {
+                Journal journal=load();String before=readRole();
+                if (journal.pending) throw new IOException("이전 작업 기록을 먼저 확인하세요.");
+                checkChangeContext(journal,before);
+                requireAccess();
+                if (!"1".equals(read(OOBE_KEY))) throw new IOException("삼성 CMC 초기 설정을 먼저 완료하세요.");
+                long boot=bootCount();
+                if (boot<0) throw new IOException("재부팅 결과를 확인할 수 없어 초기화 적용을 시작하지 않습니다.");
+                if (!journal.hasOriginal) { journal.hasOriginal=true;journal.original=before; }
+                journal.pending=true;journal.kind="native-reset";journal.before=before;journal.target=role;
+                journal.nativeRequest=request;journal.nativeBootCount=boot;journal.startedAt=System.currentTimeMillis();
+                journal.lastResult="초기화 적용 요청을 기록했습니다. 재부팅 후 이 앱을 다시 열어 결과를 확인하세요.";
+                save(journal);return snapshot(journal,null);
+            }
+        }
+    }
+
+    synchronized void cancelNativeResetBeforeClick(String request) throws IOException {
+        requireWorker();
+        synchronized (PROCESS_LOCK) {
+            try (RandomAccessFile file=new RandomAccessFile(lockFile,"rw");FileLock ignored=file.getChannel().lock()) {
+                Journal journal=load();
+                if (!journal.pending || !"native-reset".equals(journal.kind) || !Objects.equals(request,journal.nativeRequest))
+                    throw new IOException("초기화 요청 기록이 일치하지 않습니다.");
+                if (bootCount()!=journal.nativeBootCount || !Objects.equals(readRole(),journal.before))
+                    throw new IOException("기기 상태가 바뀌어 대기 기록을 보존했습니다.");
+                journal.pending=false;journal.nativeRequest=null;journal.nativeBootCount=-1;
+                journal.lastResult="적용 버튼을 누르기 전에 중단했습니다. 초기화 요청은 실행하지 않았습니다.";
+                save(journal);
+            }
+        }
+    }
+
+    synchronized Snapshot reconcileNativeReset() throws IOException {
+        requireWorker();
+        synchronized (PROCESS_LOCK) {
+            try (RandomAccessFile file=new RandomAccessFile(lockFile,"rw");FileLock ignored=file.getChannel().lock()) {
+                Journal journal=load();
+                if (!journal.pending || !"native-reset".equals(journal.kind)) return snapshot(journal,null);
+                long boot=bootCount();
+                if (boot<=journal.nativeBootCount)
+                    return snapshot(journal,"초기화 적용 결과를 기다리고 있습니다. 재부팅 후 다시 확인하세요. 자동으로 재실행하지 않습니다.");
+                if (!Objects.equals(readRole(),journal.target))
+                    return snapshot(journal,"재부팅 후 역할이 요청값과 다릅니다. 삼성 CMC를 확인하고 현재 상태로 대기 기록을 정리할 수 있습니다.");
+                verify(journal.target); // Read-only verification; no Shizuku required after boot.
+                journal.pending=false;journal.hasOwned=true;journal.owned=journal.target;
+                journal.nativeRequest=null;journal.nativeBootCount=-1;
+                journal.lastResult="재부팅 후 "+roleName(journal.target)+" 역할 값을 확인했습니다. 삼성 CMC 초기 설정과 기기 연결을 진행하세요.";
+                save(journal);return snapshot(journal,null);
+            }
+        }
+    }
+
+    synchronized Snapshot acceptNativeResetState() throws IOException {
+        requireWorker();
+        synchronized (PROCESS_LOCK) {
+            try (RandomAccessFile file=new RandomAccessFile(lockFile,"rw");FileLock ignored=file.getChannel().lock()) {
+                Journal journal=load();
+                if (!journal.pending || !"native-reset".equals(journal.kind)) throw new IOException("확인할 초기화 대기 기록이 없습니다.");
+                if (bootCount()<=journal.nativeBootCount && System.currentTimeMillis()-journal.startedAt<120000)
+                    throw new IOException("초기화 처리가 진행 중일 수 있습니다. 재부팅 후 또는 2분 뒤 다시 확인하세요.");
+                String current=readRole();
+                if (!writableRole(current)) throw new IOException("현재 역할을 확인할 수 없습니다. 삼성 CMC 설정을 확인하세요.");
+                journal.pending=false;journal.hasOwned=true;journal.owned=current;
+                journal.nativeRequest=null;journal.nativeBootCount=-1;
+                journal.lastResult="현재 역할을 앱의 기준으로 확인하고 대기 기록을 정리했습니다. CMC 등록·설정은 변경하지 않았습니다.";
+                save(journal);return snapshot(journal,null);
+            }
+        }
+    }
+
+    private long bootCount() throws IOException {
+        String value=read("boot_count");
+        try { long parsed=Long.parseLong(value);return parsed>=0 ? parsed : -1; }
+        catch (RuntimeException unavailable) { return -1; }
     }
 
     private Snapshot transact(Journal journal, String before, String target, boolean restoring)
@@ -312,6 +419,7 @@ final class RoleStore {
         journal.before = null;
         journal.target = null;
         journal.kind = "";
+        journal.nativeRequest=null; journal.nativeBootCount=-1;
     }
 
     private Journal load() throws IOException {
@@ -339,13 +447,18 @@ final class RoleStore {
             journal.kind = json.getString("kind");
             journal.startedAt = json.getLong("startedAt");
             journal.lastResult = json.getString("lastResult");
+            journal.nativeRequest=json.has("nativeRequest") ? nullable(json,"nativeRequest") : null;
+            journal.nativeBootCount=json.optLong("nativeBootCount",-1);
             if ((journal.pending || journal.hasOwned) && !journal.hasOriginal)
                 throw new JSONException("missing original");
-            if (journal.pending && !("apply".equals(journal.kind) || "restore".equals(journal.kind)))
+            if (journal.pending && !("apply".equals(journal.kind) || "restore".equals(journal.kind) || "native-reset".equals(journal.kind)))
                 throw new JSONException("transaction kind");
-            if (journal.pending && "apply".equals(journal.kind)
+            if (journal.pending && ("apply".equals(journal.kind) || "native-reset".equals(journal.kind))
                     && !("sd".equals(journal.target) || "pd".equals(journal.target)))
                 throw new JSONException("transaction target");
+            if (journal.pending && "native-reset".equals(journal.kind)
+                    && (journal.nativeBootCount<0 || journal.nativeRequest==null || !journal.nativeRequest.matches("[a-f0-9]{32}")))
+                throw new JSONException("native request");
             return journal;
         } catch (JSONException e) {
             throw new IOException("역할 복원 기록을 읽을 수 없습니다. 보호를 위해 설정을 바꾸지 않습니다.", e);
@@ -374,6 +487,8 @@ final class RoleStore {
             json.put("kind", journal.kind);
             json.put("startedAt", journal.startedAt);
             json.put("lastResult", journal.lastResult);
+            json.put("nativeRequest",jsonValue(journal.nativeRequest));
+            json.put("nativeBootCount",journal.nativeBootCount);
             bytes = json.toString().getBytes(StandardCharsets.UTF_8);
         } catch (JSONException e) { throw new IOException("역할 기록을 만들지 못했습니다.", e); }
         FileOutputStream output = null;
@@ -428,6 +543,8 @@ final class RoleStore {
         String original, owned, before, target;
         String kind = "";
         long startedAt;
+        String nativeRequest;
+        long nativeBootCount=-1;
         String lastResult = "아직 이 앱에서 역할을 변경하지 않았습니다.";
     }
 
@@ -435,7 +552,7 @@ final class RoleStore {
         final String role, oobe, activation, callActivation, messageActivation;
         final boolean permissionGranted, cmcInstalled, cmcEnabled;
         final String cmcVersion;
-        final boolean hasOriginal, originalPresent, hasOwned, transactionPending, externalChange;
+        final boolean hasOriginal, originalPresent, hasOwned, transactionPending, externalChange, nativeResetPending;
         final String originalRole, ownedRole, transactionBefore, transactionTarget, transactionKind;
         final long transactionStartedAt;
         final String preparationResult, lastResult;
@@ -458,6 +575,7 @@ final class RoleStore {
             this.hasOwned = journal.hasOwned;
             this.ownedRole = journal.owned;
             this.transactionPending = journal.pending;
+            this.nativeResetPending = journal.pending && "native-reset".equals(journal.kind);
             this.transactionBefore = journal.before;
             this.transactionTarget = journal.target;
             this.transactionKind = journal.kind;
